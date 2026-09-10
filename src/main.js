@@ -277,44 +277,92 @@ window.closeSongExperience = function () {
 }
 
 let portalStarted = false
-let portalRenderer
-let activeWorldLoop = null
+let sharedRenderer = null
+let activeWorld = null
+let runtimeAnimationId = null
+let runtimeRunning = false
+let runtimeGeneration = 0
 
-function stopWorldAnimation() {
-  if (!activeWorldLoop) return
+function resizeRuntime() {
+  if (!sharedRenderer || !activeWorld) return
 
-  activeWorldLoop.running = false
-  if (activeWorldLoop.animationId !== null) {
-    cancelAnimationFrame(activeWorldLoop.animationId)
-    activeWorldLoop.animationId = null
+  const width = Math.max(1, window.innerWidth)
+  const height = Math.max(1, window.innerHeight)
+  activeWorld.camera.aspect = width / height
+  activeWorld.camera.updateProjectionMatrix()
+  sharedRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  sharedRenderer.setSize(width, height)
+}
+
+function renderActiveWorld() {
+  const world = activeWorld
+  if (!world || !sharedRenderer) return
+
+  world.update()
+  if (runtimeRunning && activeWorld === world) {
+    sharedRenderer.render(world.scene, world.camera)
   }
 }
 
-function startWorldAnimation(worldId, renderFrame) {
-  stopWorldAnimation()
+function stopWorldAnimation() {
+  runtimeRunning = false
+  runtimeGeneration += 1
+  if (runtimeAnimationId !== null) {
+    cancelAnimationFrame(runtimeAnimationId)
+    runtimeAnimationId = null
+  }
+  window.removeEventListener('resize', resizeRuntime)
+}
 
-  const loop = { worldId, renderFrame, animationId: null, running: true }
-  activeWorldLoop = loop
+function resumeRuntime() {
+  if (!sharedRenderer) {
+    sharedRenderer = new THREE.WebGLRenderer({ antialias: true })
+    document.querySelector('#portal-canvas').appendChild(sharedRenderer.domElement)
+  }
+  resizeRuntime()
+
+  if (runtimeRunning) {
+    // World switches retain the scheduler, including its one pending frame.
+    renderActiveWorld()
+    return
+  }
+
+  runtimeRunning = true
+  const generation = ++runtimeGeneration
+  window.addEventListener('resize', resizeRuntime)
 
   function animateFrame() {
-    // Ignore callbacks belonging to a stopped or replaced world.
-    if (activeWorldLoop !== loop || !loop.running) return
+    if (!runtimeRunning || generation !== runtimeGeneration) return
 
-    loop.animationId = requestAnimationFrame(animateFrame)
-    renderFrame()
+    runtimeAnimationId = requestAnimationFrame(animateFrame)
+    renderActiveWorld()
   }
 
   animateFrame()
 }
 
+function startWorldAnimation(worldId, scene, camera, update) {
+  activeWorld = { worldId, scene, camera, update }
+  resumeRuntime()
+}
+
+function disposeRuntimeRenderer() {
+  if (!sharedRenderer) return
+
+  sharedRenderer.dispose()
+  sharedRenderer.forceContextLoss()
+  sharedRenderer.domElement.remove()
+  sharedRenderer = null
+}
+
 let activeWorldLifecycle = null
 
 function disposeCurrentWorld() {
-  stopWorldAnimation()
-  activeWorldLoop = null
+  // Detach the outgoing update before disposing its scene and input.
+  activeWorld = null
   activeWorldLifecycle?.dispose()
   activeWorldLifecycle = null
-  portalRenderer = null
+  sharedRenderer?.renderLists.dispose()
 }
 
 function createWorldLifecycle(scene) {
@@ -322,10 +370,6 @@ function createWorldLifecycle(scene) {
   const nodes = new Set()
   const extraResources = new Set()
   const inputResets = []
-  let renderer = null
-  let replaceRenderer = null
-  let rendererSize = null
-  let pixelRatio = 1
   let suspended = false
   let disposed = false
 
@@ -360,16 +404,6 @@ function createWorldLifecycle(scene) {
     collect(scene.environment)
     extraResources.forEach(collect)
     resources.forEach((resource) => resource.dispose())
-
-    if (renderer) {
-      rendererSize = renderer.getSize(new THREE.Vector2())
-      pixelRatio = renderer.getPixelRatio()
-      renderer.dispose()
-      renderer.forceContextLoss()
-      renderer.domElement.remove()
-      renderer = null
-      replaceRenderer(null)
-    }
   }
 
   const lifecycle = {
@@ -389,10 +423,6 @@ function createWorldLifecycle(scene) {
     ownResource(resource) {
       extraResources.add(resource)
     },
-    ownRenderer(value, replace) {
-      renderer = value
-      replaceRenderer = replace
-    },
     suspend() {
       if (suspended || disposed) return
       suspended = true
@@ -409,19 +439,11 @@ function createWorldLifecycle(scene) {
     resume() {
       if (!suspended || disposed) return
       // Retain the current CPU scene for Step 1's close/reopen behavior.
-      // Each world still has its own renderer, recreated with its prior settings.
-      renderer = new THREE.WebGLRenderer({ antialias: true })
-      renderer.setSize(rendererSize.x, rendererSize.y)
-      renderer.setPixelRatio(pixelRatio)
-      replaceRenderer(renderer)
-      document.querySelector('#portal-canvas').appendChild(renderer.domElement)
       nodes.forEach((node) => document.body.appendChild(node))
       resetInput()
       suspended = false
       listeners.forEach(({ target, type, handler, options }) => {
         target.addEventListener(type, handler, options)
-        // Apply a resize missed while the world was detached.
-        if (type === 'resize') handler()
       })
     },
     dispose() {
@@ -437,8 +459,6 @@ function createWorldLifecycle(scene) {
       extraResources.clear()
       listeners.length = 0
       inputResets.length = 0
-      replaceRenderer = null
-      rendererSize = null
     }
   }
 
@@ -452,14 +472,13 @@ function createWorldLifecycle(scene) {
 
 window.openPortalWorld = function () {
   const world = document.querySelector('#portal-world')
-  const canvasContainer = document.querySelector('#portal-canvas')
 
   world.classList.remove('hidden')
 
   if (portalStarted) {
-    if (activeWorldLoop && !activeWorldLoop.running) {
+    if (activeWorld && !runtimeRunning) {
       activeWorldLifecycle.resume()
-      startWorldAnimation(activeWorldLoop.worldId, activeWorldLoop.renderFrame)
+      resumeRuntime()
     }
     return
   }
@@ -485,12 +504,6 @@ window.openPortalWorld = function () {
 
   camera.position.z = 8
 
-  portalRenderer = new THREE.WebGLRenderer({ antialias: true })
-  portalRenderer.setSize(window.innerWidth, window.innerHeight)
-  portalRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-
-  canvasContainer.appendChild(portalRenderer.domElement)
-  lifecycle.ownRenderer(portalRenderer, (value) => { portalRenderer = value })
 
   const portalGeometry = new THREE.TorusGeometry(2, 0.18, 32, 100)
   const portalMaterial = new THREE.MeshStandardMaterial({
@@ -569,21 +582,16 @@ scene.add(stars)
     center.rotation.z -= 0.006
     stars.rotation.y += 0.0008
 
-    portalRenderer.render(scene, camera)
   }
 
-  startWorldAnimation('portal', animate)
+  startWorldAnimation('portal', scene, camera, animate)
 
-  lifecycle.listen(window, 'resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight
-    camera.updateProjectionMatrix()
-    portalRenderer.setSize(window.innerWidth, window.innerHeight)
-  })
 }
 
 window.closePortalWorld = function () {
   stopWorldAnimation()
   activeWorldLifecycle?.suspend()
+  disposeRuntimeRenderer()
   selectedDistrict = null
   document.querySelector('#district-confirm').classList.add('hidden')
   document.querySelector('#memory-modal').classList.add('hidden')
@@ -748,14 +756,7 @@ lifecycle.listen(window, 'keyup', (event) => {
   keys[event.key.toLowerCase()] = false
 })
 
-  const canvasContainer = document.querySelector('#portal-canvas')
-  canvasContainer.innerHTML = ''
 
-  let renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  canvasContainer.appendChild(renderer.domElement)
-  lifecycle.ownRenderer(renderer, (value) => { renderer = value })
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.4)
   scene.add(ambientLight)
@@ -1110,13 +1111,12 @@ if (distanceToCore < 3) {
   nearCore = false
 }
 
-    renderer.render(scene, camera)
   }
 
   lifecycle.ownResource(cosmicSky)
   lifecycle.ownResource(mirrorMemoryMaterial)
   lifecycle.ownResource(mirrorMaterial)
-  startWorldAnimation('inHisMind', animateRoom)
+  startWorldAnimation('inHisMind', scene, camera, animateRoom)
 }
 window.closeMemory = function () {
   document.querySelector('#memory-modal').classList.add('hidden')
@@ -1135,8 +1135,6 @@ window.returnToPortal = function () {
     label.style.display = ''
   })
 
-  const canvasContainer = document.querySelector('#portal-canvas')
-  canvasContainer.innerHTML = ''
   
   portalStarted = false
 
@@ -1200,14 +1198,7 @@ lifecycle.listen(window, 'keydown', (event) => {
     keys[event.key.toLowerCase()] = false
   })
 
-  const canvasContainer = document.querySelector('#portal-canvas')
-  canvasContainer.innerHTML = ''
 
-  let renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  canvasContainer.appendChild(renderer.domElement)
-  lifecycle.ownRenderer(renderer, (value) => { renderer = value })
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.2)
   scene.add(ambientLight)
@@ -1725,12 +1716,11 @@ if (carBody.position.z < -12) {
   carBody.position.z = 5
 }
 
-    renderer.render(scene, camera)
   }
 
   lifecycle.ownResource(cityTexture)
   lifecycle.ownResource(neonSign)
-  startWorldAnimation('neonTherapy', animateNeonTherapy)
+  startWorldAnimation('neonTherapy', scene, camera, animateNeonTherapy)
 }
 
 function showLateNightDrivesRoom() {
@@ -1795,14 +1785,7 @@ lifecycle.listen(window, 'keydown', (event) => {
     keys[event.key.toLowerCase()] = false
   })
 
-  const canvasContainer = document.querySelector('#portal-canvas')
-  canvasContainer.innerHTML = ''
 
-  let renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  canvasContainer.appendChild(renderer.domElement)
-  lifecycle.ownRenderer(renderer, (value) => { renderer = value })
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.1)
   scene.add(ambientLight)
@@ -2047,10 +2030,9 @@ if (distanceToDriveSign < 4) {
   driveMemoryPrompt.style.display = 'none'
   nearDriveSign = false
 }
-    renderer.render(scene, camera)
   }
 
-  startWorldAnimation('lateNightDrives', animateLateNightDrives)
+  startWorldAnimation('lateNightDrives', scene, camera, animateLateNightDrives)
 }
 
 function showAlmostLoveRoom() {
@@ -2113,14 +2095,7 @@ lifecycle.listen(window, 'keydown', (event) => {
     keys[event.key.toLowerCase()] = false
   })
 
-  const canvasContainer = document.querySelector('#portal-canvas')
-  canvasContainer.innerHTML = ''
 
-  let renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  canvasContainer.appendChild(renderer.domElement)
-  lifecycle.ownRenderer(renderer, (value) => { renderer = value })
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.2)
   scene.add(ambientLight)
@@ -2348,8 +2323,7 @@ if (distanceToCoffeeCup < 4) {
   nearCoffeeCup = false
 }
 
-    renderer.render(scene, camera)
   }
 
-  startWorldAnimation('almostLove', animateAlmostLove)
+  startWorldAnimation('almostLove', scene, camera, animateAlmostLove)
 }
