@@ -278,8 +278,177 @@ window.closeSongExperience = function () {
 
 let portalStarted = false
 let portalRenderer
-let portalAnimationId
-let roomAnimationId
+let activeWorldLoop = null
+
+function stopWorldAnimation() {
+  if (!activeWorldLoop) return
+
+  activeWorldLoop.running = false
+  if (activeWorldLoop.animationId !== null) {
+    cancelAnimationFrame(activeWorldLoop.animationId)
+    activeWorldLoop.animationId = null
+  }
+}
+
+function startWorldAnimation(worldId, renderFrame) {
+  stopWorldAnimation()
+
+  const loop = { worldId, renderFrame, animationId: null, running: true }
+  activeWorldLoop = loop
+
+  function animateFrame() {
+    // Ignore callbacks belonging to a stopped or replaced world.
+    if (activeWorldLoop !== loop || !loop.running) return
+
+    loop.animationId = requestAnimationFrame(animateFrame)
+    renderFrame()
+  }
+
+  animateFrame()
+}
+
+let activeWorldLifecycle = null
+
+function disposeCurrentWorld() {
+  stopWorldAnimation()
+  activeWorldLoop = null
+  activeWorldLifecycle?.dispose()
+  activeWorldLifecycle = null
+  portalRenderer = null
+}
+
+function createWorldLifecycle(scene) {
+  const listeners = []
+  const nodes = new Set()
+  const extraResources = new Set()
+  const inputResets = []
+  let renderer = null
+  let replaceRenderer = null
+  let rendererSize = null
+  let pixelRatio = 1
+  let suspended = false
+  let disposed = false
+
+  function resetInput() {
+    inputResets.forEach((reset) => reset())
+  }
+
+  function releaseGraphics() {
+    // Resources are private to this world; Sets deduplicate materials/textures
+    // shared by several objects within the same scene.
+    const resources = new Set()
+    function collect(resource) {
+      if (!resource || resources.has(resource)) return
+      if (Array.isArray(resource)) {
+        resource.forEach(collect)
+      } else if (resource.isObject3D) {
+        resource.traverse((object) => {
+          collect(object.geometry)
+          collect(object.material)
+        })
+      } else if (resource.isMaterial) {
+        resources.add(resource)
+        Object.values(resource).forEach((value) => {
+          if (value?.isTexture) collect(value)
+        })
+      } else if (resource.isTexture || resource.isBufferGeometry) {
+        resources.add(resource)
+      }
+    }
+    collect(scene)
+    collect(scene.background)
+    collect(scene.environment)
+    extraResources.forEach(collect)
+    resources.forEach((resource) => resource.dispose())
+
+    if (renderer) {
+      rendererSize = renderer.getSize(new THREE.Vector2())
+      pixelRatio = renderer.getPixelRatio()
+      renderer.dispose()
+      renderer.forceContextLoss()
+      renderer.domElement.remove()
+      renderer = null
+      replaceRenderer(null)
+    }
+  }
+
+  const lifecycle = {
+    listen(target, type, handler, options) {
+      const guardedHandler = (event) => {
+        if (!suspended && !disposed) handler(event)
+      }
+      listeners.push({ target, type, handler: guardedHandler, options })
+      target.addEventListener(type, guardedHandler, options)
+    },
+    resetInputWith(reset) {
+      inputResets.push(reset)
+    },
+    ownNode(node) {
+      nodes.add(node)
+    },
+    ownResource(resource) {
+      extraResources.add(resource)
+    },
+    ownRenderer(value, replace) {
+      renderer = value
+      replaceRenderer = replace
+    },
+    suspend() {
+      if (suspended || disposed) return
+      suspended = true
+      resetInput()
+      listeners.forEach(({ target, type, handler, options }) => {
+        target.removeEventListener(type, handler, options)
+      })
+      nodes.forEach((node) => {
+        node.style.display = 'none'
+        node.remove()
+      })
+      releaseGraphics()
+    },
+    resume() {
+      if (!suspended || disposed) return
+      // Retain the current CPU scene for Step 1's close/reopen behavior.
+      // Each world still has its own renderer, recreated with its prior settings.
+      renderer = new THREE.WebGLRenderer({ antialias: true })
+      renderer.setSize(rendererSize.x, rendererSize.y)
+      renderer.setPixelRatio(pixelRatio)
+      replaceRenderer(renderer)
+      document.querySelector('#portal-canvas').appendChild(renderer.domElement)
+      nodes.forEach((node) => document.body.appendChild(node))
+      resetInput()
+      suspended = false
+      listeners.forEach(({ target, type, handler, options }) => {
+        target.addEventListener(type, handler, options)
+        // Apply a resize missed while the world was detached.
+        if (type === 'resize') handler()
+      })
+    },
+    dispose() {
+      if (disposed) return
+      lifecycle.suspend()
+      disposed = true
+      nodes.forEach((node) => {
+        node.querySelectorAll('*').forEach((child) => { child.onclick = null })
+        node.onclick = null
+      })
+      scene.clear()
+      nodes.clear()
+      extraResources.clear()
+      listeners.length = 0
+      inputResets.length = 0
+      replaceRenderer = null
+      rendererSize = null
+    }
+  }
+
+  lifecycle.listen(window, 'blur', resetInput)
+  lifecycle.listen(document, 'visibilitychange', () => {
+    if (document.hidden) resetInput()
+  })
+  activeWorldLifecycle = lifecycle
+  return lifecycle
+}
 
 window.openPortalWorld = function () {
   const world = document.querySelector('#portal-world')
@@ -287,10 +456,18 @@ window.openPortalWorld = function () {
 
   world.classList.remove('hidden')
 
-  if (portalStarted) return
+  if (portalStarted) {
+    if (activeWorldLoop && !activeWorldLoop.running) {
+      activeWorldLifecycle.resume()
+      startWorldAnimation(activeWorldLoop.worldId, activeWorldLoop.renderFrame)
+    }
+    return
+  }
   portalStarted = true
+  disposeCurrentWorld()
 
   const scene = new THREE.Scene()
+  const lifecycle = createWorldLifecycle(scene)
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.2)
   scene.add(ambientLight)
 
@@ -313,6 +490,7 @@ window.openPortalWorld = function () {
   portalRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
   canvasContainer.appendChild(portalRenderer.domElement)
+  lifecycle.ownRenderer(portalRenderer, (value) => { portalRenderer = value })
 
   const portalGeometry = new THREE.TorusGeometry(2, 0.18, 32, 100)
   const portalMaterial = new THREE.MeshStandardMaterial({
@@ -386,7 +564,6 @@ const stars = new THREE.Points(starGeometry, starMaterial)
 scene.add(stars)
 
   function animate() {
-    portalAnimationId = requestAnimationFrame(animate)
 
     portal.rotation.z += 0.01
     center.rotation.z -= 0.006
@@ -395,9 +572,9 @@ scene.add(stars)
     portalRenderer.render(scene, camera)
   }
 
-  animate()
+  startWorldAnimation('portal', animate)
 
-  window.addEventListener('resize', () => {
+  lifecycle.listen(window, 'resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight
     camera.updateProjectionMatrix()
     portalRenderer.setSize(window.innerWidth, window.innerHeight)
@@ -405,6 +582,11 @@ scene.add(stars)
 }
 
 window.closePortalWorld = function () {
+  stopWorldAnimation()
+  activeWorldLifecycle?.suspend()
+  selectedDistrict = null
+  document.querySelector('#district-confirm').classList.add('hidden')
+  document.querySelector('#memory-modal').classList.add('hidden')
   const world = document.querySelector('#portal-world')
   document.querySelector('#memory-overlay')?.style.setProperty('display', 'none')
   document.querySelector('#neon-memory-overlay')?.style.setProperty('display', 'none')
@@ -471,12 +653,14 @@ if (selectedDistrict === 'almostLove') {
 }
 
 function showInHisMindRoom() {
+  disposeCurrentWorld()
   document.querySelectorAll('.portal-label').forEach((label) => {
   label.style.display = 'none'
 })
 
 document.querySelector('#district-exit').classList.remove('hidden')
   const scene = new THREE.Scene()
+  const lifecycle = createWorldLifecycle(scene)
   const skyTexture = new THREE.TextureLoader().load('/in-his-mind-360.png')
 
 const skySphere = new THREE.Mesh(
@@ -538,16 +722,19 @@ const cosmicSky = new THREE.Mesh(skyGeometry, skyMaterial)
   let mouseX = 0
   let mouseY = 0
 
-window.addEventListener('mousemove', (event) => {
+lifecycle.listen(window, 'mousemove', (event) => {
   mouseX = (event.clientX / window.innerWidth - 0.5) * 2
   mouseY = (event.clientY / window.innerHeight - 0.5) * 2
 })
 
 const keys = {}
+  lifecycle.resetInputWith(() => {
+    Object.keys(keys).forEach((key) => { delete keys[key] })
+  })
 let memoryOpened = false
 let nearCore = false
 
-window.addEventListener('keydown', (event) => {
+lifecycle.listen(window, 'keydown', (event) => {
   const key = event.key.toLowerCase()
   keys[key] = true
 
@@ -557,17 +744,18 @@ window.addEventListener('keydown', (event) => {
   }
 })
 
-window.addEventListener('keyup', (event) => {
+lifecycle.listen(window, 'keyup', (event) => {
   keys[event.key.toLowerCase()] = false
 })
 
   const canvasContainer = document.querySelector('#portal-canvas')
   canvasContainer.innerHTML = ''
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true })
+  let renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   canvasContainer.appendChild(renderer.domElement)
+  lifecycle.ownRenderer(renderer, (value) => { renderer = value })
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.4)
   scene.add(ambientLight)
@@ -619,6 +807,7 @@ memoryPrompt.style.zIndex = '10002'
 memoryPrompt.style.display = 'none'
 
 document.body.appendChild(memoryPrompt)
+  lifecycle.ownNode(memoryPrompt)
 let memoryOverlay = document.querySelector('#memory-overlay')
 
 if (!memoryOverlay) {
@@ -646,6 +835,7 @@ if (!memoryOverlay) {
   memoryOverlay.style.display = 'none'
 
   document.body.appendChild(memoryOverlay)
+  lifecycle.ownNode(memoryOverlay)
 }
 
 memoryOverlay.querySelector('#close-memory-overlay').onclick = function () {
@@ -653,6 +843,7 @@ memoryOverlay.querySelector('#close-memory-overlay').onclick = function () {
 }
 
 document.body.appendChild(memoryOverlay)
+  lifecycle.ownNode(memoryOverlay)
 
 document.querySelector('#close-memory-overlay').onclick = function () {
   memoryOverlay.style.display = 'none'
@@ -868,7 +1059,6 @@ const leftMirror = new THREE.Mesh(
   scene.add(title)
 
   function animateRoom() {
-    roomAnimationId = requestAnimationFrame(animateRoom)
 
     title.rotation.y = Math.sin(Date.now() * 0.001) * 0.08
     const pulse = 1 + Math.sin(Date.now() * 0.003) * 0.15
@@ -923,24 +1113,21 @@ if (distanceToCore < 3) {
     renderer.render(scene, camera)
   }
 
-  animateRoom()
+  lifecycle.ownResource(cosmicSky)
+  lifecycle.ownResource(mirrorMemoryMaterial)
+  lifecycle.ownResource(mirrorMaterial)
+  startWorldAnimation('inHisMind', animateRoom)
 }
 window.closeMemory = function () {
   document.querySelector('#memory-modal').classList.add('hidden')
 }
 window.returnToPortal = function () {
+  disposeCurrentWorld()
+  selectedDistrict = null
   document.querySelector('#memory-overlay')?.style.setProperty('display', 'none')
   document.querySelector('#drive-memory-overlay')?.style.setProperty('display', 'none')
   document.querySelector('#neon-memory-overlay')?.style.setProperty('display', 'none')
   document.querySelector('#love-memory-overlay')?.style.setProperty('display', 'none')
-  if (roomAnimationId) {
-    cancelAnimationFrame(roomAnimationId)
-  }
-
-  if (portalAnimationId) {
-    cancelAnimationFrame(portalAnimationId)
-  }
-
   document.querySelector('#district-exit').classList.add('hidden')
   document.querySelector('#district-confirm').classList.add('hidden')
 
@@ -957,6 +1144,7 @@ window.returnToPortal = function () {
 }
 
 function showNeonTherapyRoom() {
+  disposeCurrentWorld()
   document.querySelectorAll('.portal-label').forEach((label) => {
     label.style.display = 'none'
   })
@@ -964,6 +1152,7 @@ function showNeonTherapyRoom() {
   document.querySelector('#district-exit').classList.remove('hidden')
 
   const scene = new THREE.Scene()
+  const lifecycle = createWorldLifecycle(scene)
 const skyTexture = new THREE.TextureLoader().load(
   '/neon-therapy-360.png'
 )
@@ -987,14 +1176,17 @@ const cityTexture = textureLoader.load(
   let mouseX = 0
   let mouseY = 0
 
-  window.addEventListener('mousemove', (event) => {
+  lifecycle.listen(window, 'mousemove', (event) => {
     mouseX = (event.clientX / window.innerWidth - 0.5) * 2
     mouseY = (event.clientY / window.innerHeight - 0.5) * 2
   })
 
   const keys = {}
+  lifecycle.resetInputWith(() => {
+    Object.keys(keys).forEach((key) => { delete keys[key] })
+  })
 
-window.addEventListener('keydown', (event) => {
+lifecycle.listen(window, 'keydown', (event) => {
   const key = event.key.toLowerCase()
   keys[key] = true
 
@@ -1004,17 +1196,18 @@ window.addEventListener('keydown', (event) => {
   }
 })
 
-  window.addEventListener('keyup', (event) => {
+  lifecycle.listen(window, 'keyup', (event) => {
     keys[event.key.toLowerCase()] = false
   })
 
   const canvasContainer = document.querySelector('#portal-canvas')
   canvasContainer.innerHTML = ''
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true })
+  let renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   canvasContainer.appendChild(renderer.domElement)
+  lifecycle.ownRenderer(renderer, (value) => { renderer = value })
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.2)
   scene.add(ambientLight)
@@ -1359,6 +1552,7 @@ neonMemoryPrompt.style.zIndex = '10002'
 neonMemoryPrompt.style.display = 'none'
 
 document.body.appendChild(neonMemoryPrompt)
+  lifecycle.ownNode(neonMemoryPrompt)
 
 let neonMemoryOverlay = document.querySelector('#neon-memory-overlay')
 
@@ -1387,6 +1581,7 @@ if (!neonMemoryOverlay) {
   neonMemoryOverlay.style.display = 'none'
 
   document.body.appendChild(neonMemoryOverlay)
+  lifecycle.ownNode(neonMemoryOverlay)
 }
 
 neonMemoryOverlay.querySelector('#close-neon-memory-overlay').onclick = function () {
@@ -1487,7 +1682,6 @@ scene.add(baseGlow)
   }
 
   function animateNeonTherapy() {
-    requestAnimationFrame(animateNeonTherapy)
 
     title.rotation.y = Math.sin(Date.now() * 0.001) * 0.08
 
@@ -1534,10 +1728,13 @@ if (carBody.position.z < -12) {
     renderer.render(scene, camera)
   }
 
-  animateNeonTherapy()
+  lifecycle.ownResource(cityTexture)
+  lifecycle.ownResource(neonSign)
+  startWorldAnimation('neonTherapy', animateNeonTherapy)
 }
 
 function showLateNightDrivesRoom() {
+  disposeCurrentWorld()
   document.querySelectorAll('.portal-label').forEach((label) => {
     label.style.display = 'none'
   })
@@ -1545,6 +1742,7 @@ function showLateNightDrivesRoom() {
   document.querySelector('#district-exit').classList.remove('hidden')
 
   const scene = new THREE.Scene()
+  const lifecycle = createWorldLifecycle(scene)
 
   const skyTexture = new THREE.TextureLoader().load('/late-night-drives-360.png')
 
@@ -1573,14 +1771,17 @@ scene.add(skySphere)
   let mouseX = 0
   let mouseY = 0
 
-  window.addEventListener('mousemove', (event) => {
+  lifecycle.listen(window, 'mousemove', (event) => {
     mouseX = (event.clientX / window.innerWidth - 0.5) * 2
     mouseY = (event.clientY / window.innerHeight - 0.5) * 2
   })
 
   const keys = {}
+  lifecycle.resetInputWith(() => {
+    Object.keys(keys).forEach((key) => { delete keys[key] })
+  })
 
-window.addEventListener('keydown', (event) => {
+lifecycle.listen(window, 'keydown', (event) => {
   const key = event.key.toLowerCase()
   keys[key] = true
 
@@ -1590,17 +1791,18 @@ window.addEventListener('keydown', (event) => {
   }
 })
 
-  window.addEventListener('keyup', (event) => {
+  lifecycle.listen(window, 'keyup', (event) => {
     keys[event.key.toLowerCase()] = false
   })
 
   const canvasContainer = document.querySelector('#portal-canvas')
   canvasContainer.innerHTML = ''
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true })
+  let renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   canvasContainer.appendChild(renderer.domElement)
+  lifecycle.ownRenderer(renderer, (value) => { renderer = value })
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.1)
   scene.add(ambientLight)
@@ -1732,6 +1934,7 @@ driveMemoryPrompt.style.zIndex = '10002'
 driveMemoryPrompt.style.display = 'none'
 
 document.body.appendChild(driveMemoryPrompt)
+  lifecycle.ownNode(driveMemoryPrompt)
 
 let driveMemoryOverlay = document.querySelector('#drive-memory-overlay')
 
@@ -1760,6 +1963,7 @@ if (!driveMemoryOverlay) {
   driveMemoryOverlay.style.display = 'none'
 
   document.body.appendChild(driveMemoryOverlay)
+  lifecycle.ownNode(driveMemoryOverlay)
 }
 
 driveMemoryOverlay.querySelector('#close-drive-memory-overlay').onclick = function () {
@@ -1810,7 +2014,6 @@ driveMemoryOverlay.querySelector('#close-drive-memory-overlay').onclick = functi
   }
 
   function animateLateNightDrives() {
-    requestAnimationFrame(animateLateNightDrives)
 
     title.rotation.y = Math.sin(Date.now() * 0.001) * 0.08
 
@@ -1847,10 +2050,11 @@ if (distanceToDriveSign < 4) {
     renderer.render(scene, camera)
   }
 
-  animateLateNightDrives()
+  startWorldAnimation('lateNightDrives', animateLateNightDrives)
 }
 
 function showAlmostLoveRoom() {
+  disposeCurrentWorld()
   document.querySelectorAll('.portal-label').forEach((label) => {
     label.style.display = 'none'
   })
@@ -1858,6 +2062,7 @@ function showAlmostLoveRoom() {
   document.querySelector('#district-exit').classList.remove('hidden')
 
   const scene = new THREE.Scene()
+  const lifecycle = createWorldLifecycle(scene)
   const skyTexture = new THREE.TextureLoader().load('/almost-love-360.png')
 
 const skySphere = new THREE.Mesh(
@@ -1884,14 +2089,17 @@ scene.add(skySphere)
   let mouseX = 0
   let mouseY = 0
 
-  window.addEventListener('mousemove', (event) => {
+  lifecycle.listen(window, 'mousemove', (event) => {
     mouseX = (event.clientX / window.innerWidth - 0.5) * 2
     mouseY = (event.clientY / window.innerHeight - 0.5) * 2
   })
 
   const keys = {}
+  lifecycle.resetInputWith(() => {
+    Object.keys(keys).forEach((key) => { delete keys[key] })
+  })
 
-window.addEventListener('keydown', (event) => {
+lifecycle.listen(window, 'keydown', (event) => {
   const key = event.key.toLowerCase()
   keys[key] = true
 
@@ -1901,17 +2109,18 @@ window.addEventListener('keydown', (event) => {
   }
 })
 
-  window.addEventListener('keyup', (event) => {
+  lifecycle.listen(window, 'keyup', (event) => {
     keys[event.key.toLowerCase()] = false
   })
 
   const canvasContainer = document.querySelector('#portal-canvas')
   canvasContainer.innerHTML = ''
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true })
+  let renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   canvasContainer.appendChild(renderer.domElement)
+  lifecycle.ownRenderer(renderer, (value) => { renderer = value })
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.2)
   scene.add(ambientLight)
@@ -1993,6 +2202,7 @@ loveMemoryPrompt.style.zIndex = '10002'
 loveMemoryPrompt.style.display = 'none'
 
 document.body.appendChild(loveMemoryPrompt)
+  lifecycle.ownNode(loveMemoryPrompt)
 
 let loveMemoryOverlay = document.querySelector('#love-memory-overlay')
 
@@ -2021,6 +2231,7 @@ if (!loveMemoryOverlay) {
   loveMemoryOverlay.style.display = 'none'
 
   document.body.appendChild(loveMemoryOverlay)
+  lifecycle.ownNode(loveMemoryOverlay)
 }
 
 loveMemoryOverlay.querySelector('#close-love-memory-overlay').onclick = function () {
@@ -2102,7 +2313,6 @@ loveMemoryOverlay.querySelector('#close-love-memory-overlay').onclick = function
   }
 
   function animateAlmostLove() {
-    requestAnimationFrame(animateAlmostLove)
 
     title.rotation.y = Math.sin(Date.now() * 0.001) * 0.08
     rose.position.y = 0.1 + Math.sin(Date.now() * 0.002) * 0.05
@@ -2141,5 +2351,5 @@ if (distanceToCoffeeCup < 4) {
     renderer.render(scene, camera)
   }
 
-  animateAlmostLove()
+  startWorldAnimation('almostLove', animateAlmostLove)
 }
