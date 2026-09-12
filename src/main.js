@@ -358,7 +358,10 @@ function disposeRuntimeRenderer() {
   sharedRenderer = null
 }
 
-// The prototype is restricted to In His Mind. Other worlds remain desktop-only.
+// Stationary XR uses the shared runtime; the portal remains browser-only.
+const stationaryVRWorlds = new Set([
+  'inHisMind', 'neonTherapy', 'lateNightDrives', 'almostLove'
+])
 let vrSupported = false
 let vrButton = null
 let xrState = null
@@ -371,7 +374,7 @@ function removeVRControl() {
 }
 
 function updateVRControl() {
-  const available = runtimeRunning && activeWorld?.worldId === 'inHisMind' &&
+  const available = runtimeRunning && stationaryVRWorlds.has(activeWorld?.worldId) &&
     vrSupported && !xrState && !sharedRenderer?.xr.isPresenting
   if (!available) {
     removeVRControl()
@@ -383,7 +386,7 @@ function updateVRControl() {
   vrButton.id = 'enter-vr-prototype'
   vrButton.textContent = 'ENTER VR'
   vrButton.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:10003;padding:12px 18px;border-radius:999px;border:1px solid white;background:#18002f;color:white;cursor:pointer;'
-  vrButton.onclick = enterInHisMindVR
+  vrButton.onclick = enterActiveWorldVR
   document.querySelector('#portal-world').appendChild(vrButton)
 }
 
@@ -458,8 +461,8 @@ function deferUntilVRExit(action) {
   return true
 }
 
-async function enterInHisMindVR() {
-  if (!runtimeRunning || activeWorld?.worldId !== 'inHisMind' || !vrSupported || xrState) return
+async function enterActiveWorldVR() {
+  if (!runtimeRunning || !stationaryVRWorlds.has(activeWorld?.worldId) || !vrSupported || xrState) return
   const state = { world: activeWorld, renderer: sharedRenderer, session: null,
     attaching: false, ended: false, ending: false, cancelled: false,
     rebuildRenderer: false, afterExit: null }
@@ -1844,18 +1847,20 @@ scene.add(baseGlow)
       }
     })
 
-    camera.rotation.y = mouseX * 0.35
-    camera.rotation.x = mouseY * -0.18
+    if (!xrState) {
+      camera.rotation.y = mouseX * 0.35
+      camera.rotation.x = mouseY * -0.18
 
-    const speed = 0.04
+      const speed = 0.04
 
-    if (keys['w']) camera.position.z -= speed
-    if (keys['s']) camera.position.z += speed
-    if (keys['a']) camera.position.x -= speed
-    if (keys['d']) camera.position.x += speed
+      if (keys['w']) camera.position.z -= speed
+      if (keys['s']) camera.position.z += speed
+      if (keys['a']) camera.position.x -= speed
+      if (keys['d']) camera.position.x += speed
 
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -3, 3)
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z, -8, 8)
+      camera.position.x = THREE.MathUtils.clamp(camera.position.x, -3, 3)
+      camera.position.z = THREE.MathUtils.clamp(camera.position.z, -8, 8)
+    }
 
     const distanceToSun = camera.position.distanceTo(sun.position)
 
@@ -2168,18 +2173,20 @@ driveMemoryOverlay.querySelector('#close-drive-memory-overlay').onclick = functi
       }
     })
 
-    camera.rotation.y = mouseX * 0.35
-    camera.rotation.x = mouseY * -0.18
+    if (!xrState) {
+      camera.rotation.y = mouseX * 0.35
+      camera.rotation.x = mouseY * -0.18
 
-    const speed = 0.04
+      const speed = 0.04
 
-    if (keys['w']) camera.position.z -= speed
-    if (keys['s']) camera.position.z += speed
-    if (keys['a']) camera.position.x -= speed
-    if (keys['d']) camera.position.x += speed
+      if (keys['w']) camera.position.z -= speed
+      if (keys['s']) camera.position.z += speed
+      if (keys['a']) camera.position.x -= speed
+      if (keys['d']) camera.position.x += speed
 
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -3, 3)
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z, -13, 8)
+      camera.position.x = THREE.MathUtils.clamp(camera.position.x, -3, 3)
+      camera.position.z = THREE.MathUtils.clamp(camera.position.z, -13, 8)
+    }
 
 const distanceToDriveSign = camera.position.distanceTo(driveSign.position)
 
@@ -2460,18 +2467,20 @@ loveMemoryOverlay.querySelector('#close-love-memory-overlay').onclick = function
       }
     })
 
-    camera.rotation.y = mouseX * 0.35
-    camera.rotation.x = mouseY * -0.18
+    if (!xrState) {
+      camera.rotation.y = mouseX * 0.35
+      camera.rotation.x = mouseY * -0.18
 
-    const speed = 0.04
+      const speed = 0.04
 
-    if (keys['w']) camera.position.z -= speed
-    if (keys['s']) camera.position.z += speed
-    if (keys['a']) camera.position.x -= speed
-    if (keys['d']) camera.position.x += speed
+      if (keys['w']) camera.position.z -= speed
+      if (keys['s']) camera.position.z += speed
+      if (keys['a']) camera.position.x -= speed
+      if (keys['d']) camera.position.x += speed
 
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -3, 3)
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z, -5, 8)
+      camera.position.x = THREE.MathUtils.clamp(camera.position.x, -3, 3)
+      camera.position.z = THREE.MathUtils.clamp(camera.position.z, -5, 8)
+    }
 
     const distanceToCoffeeCup = camera.position.distanceTo(cup.position)
 
