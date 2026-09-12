@@ -279,12 +279,11 @@ window.closeSongExperience = function () {
 let portalStarted = false
 let sharedRenderer = null
 let activeWorld = null
-let runtimeAnimationId = null
 let runtimeRunning = false
 let runtimeGeneration = 0
 
 function resizeRuntime() {
-  if (!sharedRenderer || !activeWorld) return
+  if (!sharedRenderer || !activeWorld || xrState) return
 
   const width = Math.max(1, window.innerWidth)
   const height = Math.max(1, window.innerHeight)
@@ -297,6 +296,7 @@ function resizeRuntime() {
 function renderActiveWorld() {
   const world = activeWorld
   if (!world || !sharedRenderer) return
+  if (xrState && !sharedRenderer.xr.isPresenting) return
 
   world.update()
   if (runtimeRunning && activeWorld === world) {
@@ -307,16 +307,16 @@ function renderActiveWorld() {
 function stopWorldAnimation() {
   runtimeRunning = false
   runtimeGeneration += 1
-  if (runtimeAnimationId !== null) {
-    cancelAnimationFrame(runtimeAnimationId)
-    runtimeAnimationId = null
-  }
+  sharedRenderer?.setAnimationLoop(null)
   window.removeEventListener('resize', resizeRuntime)
 }
 
 function resumeRuntime() {
   if (!sharedRenderer) {
     sharedRenderer = new THREE.WebGLRenderer({ antialias: true })
+    sharedRenderer.xr.enabled = true
+    sharedRenderer.xr.setReferenceSpaceType('local')
+    detectVRSupport(sharedRenderer)
     document.querySelector('#portal-canvas').appendChild(sharedRenderer.domElement)
   }
   resizeRuntime()
@@ -334,25 +334,178 @@ function resumeRuntime() {
   function animateFrame() {
     if (!runtimeRunning || generation !== runtimeGeneration) return
 
-    runtimeAnimationId = requestAnimationFrame(animateFrame)
     renderActiveWorld()
   }
 
+  sharedRenderer.setAnimationLoop(animateFrame)
   animateFrame()
 }
 
 function startWorldAnimation(worldId, scene, camera, update) {
   activeWorld = { worldId, scene, camera, update }
   resumeRuntime()
+  updateVRControl()
 }
 
 function disposeRuntimeRenderer() {
+  removeVRControl()
+  vrSupported = false
   if (!sharedRenderer) return
 
   sharedRenderer.dispose()
   sharedRenderer.forceContextLoss()
   sharedRenderer.domElement.remove()
   sharedRenderer = null
+}
+
+// The prototype is restricted to In His Mind. Other worlds remain desktop-only.
+let vrSupported = false
+let vrButton = null
+let xrState = null
+
+function removeVRControl() {
+  if (!vrButton) return
+  vrButton.onclick = null
+  vrButton.remove()
+  vrButton = null
+}
+
+function updateVRControl() {
+  const available = runtimeRunning && activeWorld?.worldId === 'inHisMind' &&
+    vrSupported && !xrState && !sharedRenderer?.xr.isPresenting
+  if (!available) {
+    removeVRControl()
+    return
+  }
+  if (vrButton) return
+
+  vrButton = document.createElement('button')
+  vrButton.id = 'enter-vr-prototype'
+  vrButton.textContent = 'ENTER VR'
+  vrButton.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:10003;padding:12px 18px;border-radius:999px;border:1px solid white;background:#18002f;color:white;cursor:pointer;'
+  vrButton.onclick = enterInHisMindVR
+  document.querySelector('#portal-world').appendChild(vrButton)
+}
+
+function detectVRSupport(renderer) {
+  vrSupported = false
+  if (!window.isSecureContext || !navigator.xr) return
+  navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+    if (sharedRenderer !== renderer) return
+    vrSupported = supported
+    updateVRControl()
+  }).catch(() => {
+    if (sharedRenderer === renderer) {
+      vrSupported = false
+      updateVRControl()
+    }
+  })
+}
+
+function finishVR(state) {
+  if (xrState !== state || state.attaching || (state.session && !state.ended)) return
+  state.session?.removeEventListener('end', state.onEnd)
+
+  if (state.origin) {
+    state.origin.remove(state.world.camera)
+    state.origin.removeFromParent()
+    state.world.camera.copy(state.savedCamera, false)
+    state.parent?.add(state.world.camera)
+    state.world.camera.updateMatrixWorld(true)
+  }
+  xrState = null
+  activeWorldLifecycle?.resetInput()
+
+  // A failed/interrupted WebXR setup can leave Three's manager partially set up.
+  // Recreate only that failed runtime, after the real session has ended.
+  if (state.rebuildRenderer && sharedRenderer === state.renderer) {
+    stopWorldAnimation()
+    disposeRuntimeRenderer()
+  }
+  if (state.afterExit) {
+    state.afterExit()
+  } else if (sharedRenderer === state.renderer || state.rebuildRenderer) {
+    if (!runtimeRunning) resumeRuntime()
+    resizeRuntime()
+  }
+  updateVRControl()
+}
+
+async function endVR(state) {
+  if (!state.session || state.attaching || state.ending || state.ended) return
+  state.ending = true
+  try {
+    await state.session.end()
+    state.ended = true
+    finishVR(state)
+  } catch (error) {
+    state.ending = false
+    if (state.ended) {
+      finishVR(state)
+    } else {
+      state.afterExit = null
+      window.alert(`VR could not exit. Use the headset/browser exit control. ${error.message}`)
+    }
+  }
+}
+
+function deferUntilVRExit(action) {
+  if (!xrState) return false
+  xrState.cancelled = true
+  xrState.afterExit = action
+  // A pending request/setup must settle before its session or renderer is released.
+  endVR(xrState)
+  return true
+}
+
+async function enterInHisMindVR() {
+  if (!runtimeRunning || activeWorld?.worldId !== 'inHisMind' || !vrSupported || xrState) return
+  const state = { world: activeWorld, renderer: sharedRenderer, session: null,
+    attaching: false, ended: false, ending: false, cancelled: false,
+    rebuildRenderer: false, afterExit: null }
+  activeWorldLifecycle.resetInput()
+  xrState = state
+  updateVRControl()
+
+  try {
+    state.session = await navigator.xr.requestSession('immersive-vr')
+    state.onEnd = () => {
+      state.ended = true
+      if (state.attaching) state.rebuildRenderer = true
+      // Let Three.js finish its own session-end listener before restoring desktop.
+      queueMicrotask(() => finishVR(state))
+    }
+    state.session.addEventListener('end', state.onEnd)
+    if (state.cancelled) {
+      await endVR(state)
+      return
+    }
+
+    const camera = state.world.camera
+    state.savedCamera = camera.clone()
+    state.parent = camera.parent
+    state.origin = new THREE.Group()
+    state.origin.position.copy(camera.position)
+    // Keep the current heading with a level horizon; headset pose owns pitch/roll.
+    state.origin.rotation.y = camera.rotation.y
+    state.world.scene.add(state.origin)
+    state.origin.add(camera)
+    camera.position.set(0, 0, 0)
+    camera.quaternion.identity()
+    state.origin.updateMatrixWorld(true)
+
+    state.attaching = true
+    await state.renderer.xr.setSession(state.session)
+    state.attaching = false
+    if (state.ended) finishVR(state)
+    else if (state.cancelled) await endVR(state)
+  } catch (error) {
+    state.attaching = false
+    state.rebuildRenderer = Boolean(state.origin)
+    if (!state.cancelled) window.alert(`Unable to enter VR: ${error.message}`)
+    if (state.session && !state.ended) await endVR(state)
+    else finishVR(state)
+  }
 }
 
 let activeWorldLifecycle = null
@@ -407,9 +560,10 @@ function createWorldLifecycle(scene) {
   }
 
   const lifecycle = {
+    resetInput,
     listen(target, type, handler, options) {
       const guardedHandler = (event) => {
-        if (!suspended && !disposed) handler(event)
+        if (!suspended && !disposed && !xrState) handler(event)
       }
       listeners.push({ target, type, handler: guardedHandler, options })
       target.addEventListener(type, guardedHandler, options)
@@ -479,6 +633,7 @@ window.openPortalWorld = function () {
     if (activeWorld && !runtimeRunning) {
       activeWorldLifecycle.resume()
       resumeRuntime()
+      updateVRControl()
     }
     return
   }
@@ -589,6 +744,7 @@ scene.add(stars)
 }
 
 window.closePortalWorld = function () {
+  if (deferUntilVRExit(() => window.closePortalWorld())) return
   stopWorldAnimation()
   activeWorldLifecycle?.suspend()
   disposeRuntimeRenderer()
@@ -641,6 +797,7 @@ window.closeDistrictConfirm = function () {
 }
 
 window.confirmEnterDistrict = function () {
+  if (deferUntilVRExit(() => window.confirmEnterDistrict())) return
   closeDistrictConfirm()
 
   if (selectedDistrict === 'inHisMind') {
@@ -1075,17 +1232,19 @@ mirrors.forEach(({ mirror, offset }) => {
   const pulse = 1 + Math.sin(Date.now() * 0.002 + offset) * 0.03
   mirror.scale.set(pulse, pulse, 1)
 })
-    camera.rotation.y = mouseX * 0.35
-    camera.rotation.x = mouseY * -0.18
-    const speed = 0.04
+    if (!xrState) {
+      camera.rotation.y = mouseX * 0.35
+      camera.rotation.x = mouseY * -0.18
+      const speed = 0.04
 
-    if (keys['w']) camera.position.z -= speed
-    if (keys['s']) camera.position.z += speed
-    if (keys['a']) camera.position.x -= speed
-    if (keys['d']) camera.position.x += speed
+      if (keys['w']) camera.position.z -= speed
+      if (keys['s']) camera.position.z += speed
+      if (keys['a']) camera.position.x -= speed
+      if (keys['d']) camera.position.x += speed
 
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -3, 3)
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z, -2, 8)
+      camera.position.x = THREE.MathUtils.clamp(camera.position.x, -3, 3)
+      camera.position.z = THREE.MathUtils.clamp(camera.position.z, -2, 8)
+    }
     
 particles.forEach((particle) => {
   particle.mesh.position.y += particle.speed
@@ -1122,6 +1281,7 @@ window.closeMemory = function () {
   document.querySelector('#memory-modal').classList.add('hidden')
 }
 window.returnToPortal = function () {
+  if (deferUntilVRExit(() => window.returnToPortal())) return
   disposeCurrentWorld()
   selectedDistrict = null
   document.querySelector('#memory-overlay')?.style.setProperty('display', 'none')
