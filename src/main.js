@@ -369,6 +369,65 @@ let vrSupported = false
 let vrButton = null
 let xrState = null
 
+// TEMPORARY: opt-in diagnostics only; no extra support probes or XR requests.
+const xrDebugEnabled = new URLSearchParams(window.location.search).get('xrdebug') === '1'
+let xrDebugProbe = { status: 'not run' }
+
+function updateXRDebug() {
+  if (!xrDebugEnabled) return
+  try {
+    let panel = document.querySelector('#xr-debug-panel')
+    if (!panel) {
+      panel = document.createElement('details')
+      panel.id = 'xr-debug-panel'
+      panel.open = true
+      panel.style.cssText = 'position:fixed;top:70px;left:12px;z-index:2147483647;max-width:calc(100vw - 24px);width:380px;max-height:55vh;overflow:auto;padding:10px;background:#111;color:#fff;font:12px/1.4 monospace;'
+      const title = document.createElement('summary')
+      title.textContent = 'TEMP XR diagnostics v1'
+      const refresh = document.createElement('button')
+      refresh.textContent = 'Refresh snapshot (no XR retry)'
+      refresh.onclick = updateXRDebug
+      const output = document.createElement('pre')
+      output.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;'
+      panel.append(title, refresh, output)
+      document.body.appendChild(panel)
+    }
+    const policy = document.permissionsPolicy || document.featurePolicy
+    let trackingPolicy = 'API unavailable'
+    try {
+      if (policy?.allowsFeature) {
+        trackingPolicy = policy.features && !policy.features().includes('xr-spatial-tracking')
+          ? 'feature not recognized' : policy.allowsFeature('xr-spatial-tracking')
+      }
+    } catch (error) {
+      trackingPolicy = `${error.name}: ${error.message}`
+    }
+    const snapshot = {
+      origin: window.location.origin,
+      isSecureContext: window.isSecureContext,
+      navigatorXR: Boolean(navigator.xr),
+      topLevel: window.self === window.top,
+      visibilityState: document.visibilityState,
+      hasFocus: document.hasFocus(),
+      xrSpatialTrackingAllowed: trackingPolicy,
+      supportProbe: xrDebugProbe,
+      activeWorld: activeWorld?.worldId ?? null,
+      worldEligible: stationaryVRWorlds.has(activeWorld?.worldId),
+      runtimeRunning,
+      rendererExists: Boolean(sharedRenderer),
+      vrSupported,
+      xrRequestOrSession: Boolean(xrState),
+      xrIsPresenting: Boolean(sharedRenderer?.xr.isPresenting),
+      enterVREligible: Boolean(runtimeRunning && stationaryVRWorlds.has(activeWorld?.worldId) &&
+        vrSupported && !xrState && !sharedRenderer?.xr.isPresenting),
+      buttonConnected: Boolean(vrButton?.isConnected)
+    }
+    panel.querySelector('pre').textContent = JSON.stringify(snapshot, null, 2)
+  } catch (error) {
+    console.warn('XR diagnostics failed:', error)
+  }
+}
+
 function removeVRControl() {
   if (!vrButton) return
   vrButton.onclick = null
@@ -381,9 +440,13 @@ function updateVRControl() {
     vrSupported && !xrState && !sharedRenderer?.xr.isPresenting
   if (!available) {
     removeVRControl()
+    updateXRDebug()
     return
   }
-  if (vrButton) return
+  if (vrButton) {
+    updateXRDebug()
+    return
+  }
 
   vrButton = document.createElement('button')
   vrButton.id = 'enter-vr-prototype'
@@ -391,17 +454,27 @@ function updateVRControl() {
   vrButton.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:10003;padding:12px 18px;border-radius:999px;border:1px solid white;background:#18002f;color:white;cursor:pointer;'
   vrButton.onclick = enterActiveWorldVR
   document.querySelector('#portal-world').appendChild(vrButton)
+  updateXRDebug()
 }
 
 function detectVRSupport(renderer) {
   vrSupported = false
+  if (xrDebugEnabled) xrDebugProbe = {
+    status: !window.isSecureContext || !navigator.xr ? 'skipped' : 'pending',
+    visibilityAtProbe: document.visibilityState,
+    focusAtProbe: document.hasFocus()
+  }
+  updateXRDebug()
   if (!window.isSecureContext || !navigator.xr) return
   navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
     if (sharedRenderer !== renderer) return
+    if (xrDebugEnabled) xrDebugProbe = { ...xrDebugProbe, status: 'resolved', result: supported }
     vrSupported = supported
     updateVRControl()
-  }).catch(() => {
+  }).catch((error) => {
     if (sharedRenderer === renderer) {
+      if (xrDebugEnabled) xrDebugProbe = { ...xrDebugProbe, status: 'rejected',
+        errorName: error?.name ?? null, errorMessage: error?.message ?? String(error) }
       vrSupported = false
       updateVRControl()
     }
