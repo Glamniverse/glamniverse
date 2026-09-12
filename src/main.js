@@ -218,6 +218,7 @@ const songs = {
 }
 
 window.openSongExperience = function (songId) {
+  if (xrState) return
   const song = songs[songId]
 
   const modal = document.querySelector('#song-modal')
@@ -253,6 +254,7 @@ window.openSongExperience = function (songId) {
 }
 
 window.toggleSong = function () {
+  if (xrState) return
   const audio = document.querySelector('#song-audio')
 
   if (audio.paused) {
@@ -263,6 +265,7 @@ window.toggleSong = function () {
 }
 
 window.closeSongExperience = function () {
+  if (xrState) return
   const modal = document.querySelector('#song-modal')
   const video = document.querySelector('#song-video')
   const audio = document.querySelector('#song-audio')
@@ -405,8 +408,35 @@ function detectVRSupport(renderer) {
   })
 }
 
+// Borrow the existing stereo player only for the lifetime of this XR request/session.
+function startVRSoundtrack(state) {
+  try {
+    const audio = document.querySelector('#song-audio')
+    state.soundtrack = audio
+    audio.pause()
+    document.querySelector('#song-video').pause()
+    document.querySelector('#song-modal').classList.add('hidden')
+
+    const source = songs[state.world.worldId].audio
+    if (audio.getAttribute('src') !== source) {
+      audio.src = source
+      audio.load()
+    }
+    // Stay inside the ENTER VR gesture; never await audio before requesting XR.
+    audio.play()?.catch((error) => console.warn('VR soundtrack playback failed:', error))
+  } catch (error) {
+    console.warn('VR soundtrack playback failed:', error)
+  }
+}
+
+function pauseVRSoundtrack(state) {
+  state.soundtrack?.pause()
+}
+
 function finishVR(state) {
   if (xrState !== state || state.attaching || (state.session && !state.ended)) return
+  pauseVRSoundtrack(state)
+  state.soundtrack = null
   state.session?.removeEventListener('end', state.onEnd)
 
   if (state.origin) {
@@ -454,6 +484,7 @@ async function endVR(state) {
 
 function deferUntilVRExit(action) {
   if (!xrState) return false
+  pauseVRSoundtrack(xrState)
   xrState.cancelled = true
   xrState.afterExit = action
   // A pending request/setup must settle before its session or renderer is released.
@@ -469,10 +500,12 @@ async function enterActiveWorldVR() {
   activeWorldLifecycle.resetInput()
   xrState = state
   updateVRControl()
+  startVRSoundtrack(state)
 
   try {
     state.session = await navigator.xr.requestSession('immersive-vr')
     state.onEnd = () => {
+      if (xrState === state) pauseVRSoundtrack(state)
       state.ended = true
       if (state.attaching) state.rebuildRenderer = true
       // Let Three.js finish its own session-end listener before restoring desktop.
