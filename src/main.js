@@ -524,6 +524,16 @@ function createXRLocomotion(state) {
   }
 }
 
+// Reuse desktop memory content, preserving explicit HTML line breaks in VR.
+function xrMemoryFromOverlay(object, overlay) {
+  return {
+    object,
+    title: overlay.querySelector('h2').textContent,
+    text: Array.from(overlay.querySelector('p').childNodes,
+      node => node.nodeName === 'BR' ? '\n' : node.textContent).join('')
+  }
+}
+
 // Session-owned controller picking; targets are explicit, never the whole world.
 function createXRControllerInteraction(state) {
   const targets = []
@@ -627,7 +637,8 @@ function createXRControllerInteraction(state) {
 
   const memory = state.world.xrMemory
   if (memory) {
-    const baseEmissive = memory.object.material.emissive.clone()
+    const highlightColor = memory.object.material.emissive || memory.object.material.color
+    const baseHighlight = highlightColor.clone()
     const closeMemoryPanel = () => {
       memoryPanel.visible = false
       locomotion.reset()
@@ -666,7 +677,10 @@ function createXRControllerInteraction(state) {
           ctx.font = 'bold 64px sans-serif'
           ctx.fillText(memory.title, 512, 95)
           ctx.font = '48px sans-serif'
-          ctx.fillText(memory.text, 512, 235, 930)
+          const lines = memory.text.split('\n')
+          lines.forEach((line, index) => {
+            ctx.fillText(line, 512, 235 + (index - (lines.length - 1) / 2) * 64, 930)
+          })
         }, 1.4, 0.7)
         card.name = 'xr-memory-content'
         const close = makeCard(512, 128, ctx => {
@@ -694,7 +708,7 @@ function createXRControllerInteraction(state) {
     interaction.addTarget(memory.object, openMemoryPanel, {
       owned: false,
       enabled: () => !memoryPanel?.visible,
-      onHover: hovered => memory.object.material.emissive.copy(hovered ? new THREE.Color(0xffaaff) : baseEmissive)
+      onHover: hovered => highlightColor.copy(hovered ? new THREE.Color(0xffaaff) : baseHighlight)
     })
   }
 
@@ -2227,7 +2241,8 @@ if (carBody.position.z < -12) {
 
   lifecycle.ownResource(cityTexture)
   lifecycle.ownResource(neonSign)
-  startWorldAnimation('neonTherapy', scene, camera, animateNeonTherapy)
+  startWorldAnimation('neonTherapy', scene, camera, animateNeonTherapy,
+    xrMemoryFromOverlay(sun, neonMemoryOverlay))
 }
 
 function showLateNightDrivesRoom() {
@@ -2541,7 +2556,8 @@ if (distanceToDriveSign < 4) {
 }
   }
 
-  startWorldAnimation('lateNightDrives', scene, camera, animateLateNightDrives)
+  startWorldAnimation('lateNightDrives', scene, camera, animateLateNightDrives,
+    xrMemoryFromOverlay(driveSign, driveMemoryOverlay))
 }
 
 function showAlmostLoveRoom() {
@@ -2836,5 +2852,6 @@ if (distanceToCoffeeCup < 4) {
 
   }
 
-  startWorldAnimation('almostLove', scene, camera, animateAlmostLove)
+  startWorldAnimation('almostLove', scene, camera, animateAlmostLove,
+    xrMemoryFromOverlay(cup, loveMemoryOverlay))
 }
