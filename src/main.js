@@ -296,13 +296,13 @@ function resizeRuntime() {
   sharedRenderer.setSize(width, height)
 }
 
-function renderActiveWorld() {
+function renderActiveWorld(time, frame) {
   const world = activeWorld
   if (!world || !sharedRenderer) return
   if (xrState && !sharedRenderer.xr.isPresenting) return
 
   world.update()
-  xrState?.interaction?.update()
+  xrState?.interaction?.update(time, frame)
   if (runtimeRunning && activeWorld === world) {
     sharedRenderer.render(world.scene, world.camera)
   }
@@ -335,10 +335,10 @@ function resumeRuntime() {
   const generation = ++runtimeGeneration
   window.addEventListener('resize', resizeRuntime)
 
-  function animateFrame() {
+  function animateFrame(time, frame) {
     if (!runtimeRunning || generation !== runtimeGeneration) return
 
-    renderActiveWorld()
+    renderActiveWorld(time, frame)
   }
 
   sharedRenderer.setAnimationLoop(animateFrame)
@@ -434,10 +434,101 @@ function pauseVRSoundtrack(state) {
   state.soundtrack?.pause()
 }
 
+// Match desktop camera bounds; locomotion constrains the horizontal viewer position.
+const xrLocomotionBounds = {
+  inHisMind: { minZ: -2, maxZ: 8 },
+  neonTherapy: { minZ: -8, maxZ: 8 },
+  lateNightDrives: { minZ: -13, maxZ: 8 },
+  almostLove: { minZ: -5, maxZ: 8 }
+}
+
+function createXRLocomotion(state) {
+  const bounds = xrLocomotionBounds[state.world.worldId]
+  const speed = 1 // world units per second; desktop movement is unchanged
+  const deadzone = 0.20
+  const snapAngle = THREE.MathUtils.degToRad(30)
+  const headOffset = new THREE.Vector3()
+  const beforeTurn = new THREE.Vector3()
+  const forward = new THREE.Vector3()
+  const right = new THREE.Vector3()
+  const orientation = new THREE.Quaternion()
+  let lastTime = null
+  let moveReady = false
+  let turnReady = false
+
+  function reset() {
+    lastTime = null
+    moveReady = false
+    turnReady = false
+  }
+
+  function stick(controllers, hand) {
+    const entry = controllers.find(entry => entry.connected && entry.controller.visible &&
+      entry.source?.handedness === hand && entry.source.gamepad?.mapping === 'xr-standard')
+    const axes = entry?.source.gamepad.axes
+    if (!axes || !Number.isFinite(axes[2]) || !Number.isFinite(axes[3])) return null
+    return { x: axes[2], y: axes[3] }
+  }
+
+  return {
+    reset,
+    update(time, frame, controllers, enabled) {
+      if (!enabled || !frame || !Number.isFinite(time) || !bounds) { reset(); return }
+      const pose = frame.getViewerPose(state.renderer.xr.getReferenceSpace())
+      if (!pose) { reset(); return }
+      const dt = lastTime === null ? 0 : Math.min(Math.max((time - lastTime) / 1000, 0), 0.05)
+      lastTime = time
+      const left = stick(controllers, 'left')
+      const turn = stick(controllers, 'right')
+      const origin = state.origin
+      const head = pose.transform.position
+      headOffset.set(head.x, head.y, head.z).applyQuaternion(origin.quaternion)
+
+      if (!turn) turnReady = false
+      else if (Math.hypot(turn.x, turn.y) < 0.25) turnReady = true
+      else if (turnReady && Math.abs(turn.x) >= 0.70) {
+        turnReady = false
+        beforeTurn.copy(headOffset)
+        origin.rotation.y -= Math.sign(turn.x) * snapAngle
+        headOffset.set(head.x, head.y, head.z).applyQuaternion(origin.quaternion)
+        // Pivot about the current headset, without changing origin/floor height.
+        origin.position.x += beforeTurn.x - headOffset.x
+        origin.position.z += beforeTurn.z - headOffset.z
+      }
+
+      if (!left) moveReady = false
+      else {
+        const magnitude = Math.hypot(left.x, left.y)
+        if (magnitude <= deadzone) moveReady = true
+        else if (moveReady) {
+          const q = pose.transform.orientation
+          orientation.set(q.x, q.y, q.z, q.w)
+          forward.set(0, 0, -1).applyQuaternion(orientation).applyQuaternion(origin.quaternion)
+          forward.y = 0
+          // At a vertical gaze there is no reliable horizontal facing direction.
+          if (forward.lengthSq() > 0.0001) {
+            forward.normalize()
+            right.set(-forward.z, 0, forward.x)
+            const distance = speed * dt * (Math.min(magnitude, 1) - deadzone) / (1 - deadzone)
+            const dx = (right.x * left.x - forward.x * left.y) / magnitude * distance
+            const dz = (right.z * left.x - forward.z * left.y) / magnitude * distance
+            const viewerX = origin.position.x + headOffset.x
+            const viewerZ = origin.position.z + headOffset.z
+            origin.position.x += THREE.MathUtils.clamp(viewerX + dx, -3, 3) - viewerX
+            origin.position.z += THREE.MathUtils.clamp(viewerZ + dz, bounds.minZ, bounds.maxZ) - viewerZ
+          }
+        }
+      }
+      origin.updateMatrixWorld(true)
+    }
+  }
+}
+
 // Session-owned controller picking; targets are explicit, never the whole world.
 function createXRControllerInteraction(state) {
   const targets = []
   const controllers = []
+  const locomotion = createXRLocomotion(state)
   const resources = []
   const raycaster = new THREE.Raycaster()
   const rotation = new THREE.Matrix4()
@@ -461,7 +552,8 @@ function createXRControllerInteraction(state) {
     addTarget(object, onSelect) {
       targets.push({ object, onSelect })
     },
-    update() {
+    update(time, frame) {
+      locomotion.update(time, frame, controllers, enabled())
       const hovered = new Set()
       for (const entry of controllers) {
         const hit = pick(entry)
@@ -477,10 +569,12 @@ function createXRControllerInteraction(state) {
     dispose() {
       if (disposed) return
       disposed = true
+      locomotion.reset()
       for (const entry of controllers) {
         entry.controller.removeEventListener('connected', entry.onConnected)
         entry.controller.removeEventListener('disconnected', entry.onDisconnected)
         entry.controller.removeEventListener('select', entry.onSelect)
+        entry.source = null
         entry.ray.removeFromParent()
         entry.controller.removeFromParent()
       }
@@ -537,9 +631,12 @@ function createXRControllerInteraction(state) {
     ray.renderOrder = 10001
     const entry = { controller, ray, connected: false }
     entry.onConnected = event => {
+      locomotion.reset()
+      entry.source = event.data
       entry.connected = event.data.targetRayMode === 'tracked-pointer' && !event.data.hand
     }
     entry.onDisconnected = () => {
+      entry.source = null
       entry.connected = false
       interaction.update()
     }
