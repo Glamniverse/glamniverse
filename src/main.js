@@ -345,8 +345,8 @@ function resumeRuntime() {
   animateFrame()
 }
 
-function startWorldAnimation(worldId, scene, camera, update) {
-  activeWorld = { worldId, scene, camera, update }
+function startWorldAnimation(worldId, scene, camera, update, xrMemory = null) {
+  activeWorld = { worldId, scene, camera, update, xrMemory }
   resumeRuntime()
   updateVRControl()
 }
@@ -533,6 +533,7 @@ function createXRControllerInteraction(state) {
   const raycaster = new THREE.Raycaster()
   const rotation = new THREE.Matrix4()
   let disposed = false
+  let memoryPanel = null
   const enabled = () => !disposed && xrState === state && !state.cancelled &&
     !state.ended && !state.attaching && state.renderer.xr.isPresenting &&
     state.session.visibilityState === 'visible'
@@ -544,16 +545,21 @@ function createXRControllerInteraction(state) {
     rotation.extractRotation(entry.controller.matrixWorld)
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation).normalize()
     raycaster.far = 5
-    for (const target of targets) target.object.updateWorldMatrix(true, false)
-    return raycaster.intersectObjects(targets.map(target => target.object), false)[0] || null
+    const objects = targets.filter(target => target.isEnabled()).map(target => target.object)
+    for (const object of objects) object.updateWorldMatrix(true, false)
+    return raycaster.intersectObjects(objects, false)[0] || null
   }
 
   const interaction = {
-    addTarget(object, onSelect) {
-      targets.push({ object, onSelect })
+    addTarget(object, onSelect, options = {}) {
+      const baseColor = object.material.color.clone()
+      const target = { object, onSelect, owned: options.owned !== false,
+        isEnabled: () => object.visible && (options.enabled?.() ?? true),
+        onHover: options.onHover || (hovered => object.material.color.copy(hovered ? new THREE.Color(0x66ffff) : baseColor)) }
+      targets.push(target)
     },
     update(time, frame) {
-      locomotion.update(time, frame, controllers, enabled())
+      locomotion.update(time, frame, controllers, enabled() && !memoryPanel?.visible)
       const hovered = new Set()
       for (const entry of controllers) {
         const hit = pick(entry)
@@ -563,7 +569,7 @@ function createXRControllerInteraction(state) {
         if (hit) hovered.add(hit.object)
       }
       for (const target of targets) {
-        target.object.material.color.setHex(hovered.has(target.object) ? 0x66ffff : 0xffffff)
+        target.onHover(hovered.has(target.object) && target.isEnabled())
       }
     },
     dispose() {
@@ -579,9 +585,11 @@ function createXRControllerInteraction(state) {
         entry.controller.removeFromParent()
       }
       for (const target of targets) {
-        target.object.material.color.setHex(0xffffff)
-        target.object.removeFromParent()
+        target.onHover(false)
+        if (target.owned) target.object.removeFromParent()
       }
+      memoryPanel?.removeFromParent()
+      memoryPanel = null
       resources.forEach(resource => resource.dispose())
       controllers.length = 0
       targets.length = 0
@@ -616,6 +624,79 @@ function createXRControllerInteraction(state) {
   button.renderOrder = 10000
   state.origin.add(button)
   interaction.addTarget(button, () => window.returnToPortal())
+
+  const memory = state.world.xrMemory
+  if (memory) {
+    const baseEmissive = memory.object.material.emissive.clone()
+    const closeMemoryPanel = () => {
+      memoryPanel.visible = false
+      locomotion.reset()
+    }
+    const openMemoryPanel = () => {
+      if (memoryPanel?.visible) return
+      if (!memoryPanel) {
+        memoryPanel = new THREE.Group()
+        memoryPanel.name = 'xr-memory-panel'
+        memoryPanel.visible = false
+        state.world.scene.add(memoryPanel)
+        const makeCard = (width, height, draw, meshWidth, meshHeight) => {
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.fillStyle = 'rgba(16, 4, 32, 0.96)'
+          ctx.fillRect(0, 0, width, height)
+          ctx.strokeStyle = '#ff66ff'
+          ctx.lineWidth = 6
+          ctx.strokeRect(3, 3, width - 6, height - 6)
+          ctx.fillStyle = '#ffffff'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          draw(ctx)
+          const texture = own(new THREE.CanvasTexture(canvas))
+          texture.colorSpace = THREE.SRGBColorSpace
+          const card = new THREE.Mesh(own(new THREE.PlaneGeometry(meshWidth, meshHeight)),
+            own(new THREE.MeshBasicMaterial({ map: texture, transparent: true,
+              depthTest: false, depthWrite: false, toneMapped: false })))
+          card.renderOrder = 10000
+          memoryPanel.add(card)
+          return card
+        }
+        const card = makeCard(1024, 512, ctx => {
+          ctx.font = 'bold 64px sans-serif'
+          ctx.fillText(memory.title, 512, 95)
+          ctx.font = '48px sans-serif'
+          ctx.fillText(memory.text, 512, 235, 930)
+        }, 1.4, 0.7)
+        card.name = 'xr-memory-content'
+        const close = makeCard(512, 128, ctx => {
+          ctx.font = 'bold 48px sans-serif'
+          ctx.fillText('CLOSE', 256, 64)
+        }, 0.5, 0.125)
+        close.name = 'xr-memory-close'
+        close.position.set(0, -0.24, 0.01)
+        close.renderOrder = 10001
+        interaction.addTarget(close, closeMemoryPanel, { enabled: () => Boolean(memoryPanel?.visible) })
+      }
+      const viewer = state.renderer.xr.getCamera()
+      const position = viewer.getWorldPosition(new THREE.Vector3())
+      const facing = new THREE.Vector3(0, 0, -1).applyQuaternion(viewer.getWorldQuaternion(new THREE.Quaternion()))
+      facing.y = 0
+      if (facing.lengthSq() < 0.0001) facing.set(0, 0, -1).applyQuaternion(state.origin.quaternion)
+      facing.normalize()
+      memoryPanel.position.copy(position).addScaledVector(facing, 1.8)
+      memoryPanel.position.y += 0.15
+      memoryPanel.rotation.y = Math.atan2(-facing.x, -facing.z)
+      memoryPanel.visible = true
+      memoryPanel.updateMatrixWorld(true)
+      locomotion.reset()
+    }
+    interaction.addTarget(memory.object, openMemoryPanel, {
+      owned: false,
+      enabled: () => !memoryPanel?.visible,
+      onHover: hovered => memory.object.material.emissive.copy(hovered ? new THREE.Color(0xffaaff) : baseEmissive)
+    })
+  }
 
   for (let index = 0; index < 2; index++) {
     const controller = state.renderer.xr.getController(index)
@@ -1535,7 +1616,11 @@ if (distanceToCore < 3) {
   lifecycle.ownResource(cosmicSky)
   lifecycle.ownResource(mirrorMemoryMaterial)
   lifecycle.ownResource(mirrorMaterial)
-  startWorldAnimation('inHisMind', scene, camera, animateRoom)
+  startWorldAnimation('inHisMind', scene, camera, animateRoom, {
+    object: core,
+    title: memoryOverlay.querySelector('h2').textContent,
+    text: memoryOverlay.querySelector('p').textContent
+  })
 }
 window.closeMemory = function () {
   document.querySelector('#memory-modal').classList.add('hidden')
