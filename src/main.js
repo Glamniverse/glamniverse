@@ -302,6 +302,7 @@ function renderActiveWorld() {
   if (xrState && !sharedRenderer.xr.isPresenting) return
 
   world.update()
+  xrState?.interaction?.update()
   if (runtimeRunning && activeWorld === world) {
     sharedRenderer.render(world.scene, world.camera)
   }
@@ -433,8 +434,133 @@ function pauseVRSoundtrack(state) {
   state.soundtrack?.pause()
 }
 
+// Session-owned controller picking; targets are explicit, never the whole world.
+function createXRControllerInteraction(state) {
+  const targets = []
+  const controllers = []
+  const resources = []
+  const raycaster = new THREE.Raycaster()
+  const rotation = new THREE.Matrix4()
+  let disposed = false
+  const enabled = () => !disposed && xrState === state && !state.cancelled &&
+    !state.ended && !state.attaching && state.renderer.xr.isPresenting &&
+    state.session.visibilityState === 'visible'
+
+  function pick(entry) {
+    if (!enabled() || !entry.connected || !entry.controller.visible) return null
+    entry.controller.updateWorldMatrix(true, false)
+    raycaster.ray.origin.setFromMatrixPosition(entry.controller.matrixWorld)
+    rotation.extractRotation(entry.controller.matrixWorld)
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation).normalize()
+    raycaster.far = 5
+    for (const target of targets) target.object.updateWorldMatrix(true, false)
+    return raycaster.intersectObjects(targets.map(target => target.object), false)[0] || null
+  }
+
+  const interaction = {
+    addTarget(object, onSelect) {
+      targets.push({ object, onSelect })
+    },
+    update() {
+      const hovered = new Set()
+      for (const entry of controllers) {
+        const hit = pick(entry)
+        entry.ray.visible = enabled() && entry.connected && entry.controller.visible
+        entry.ray.scale.z = hit ? hit.distance : 5
+        entry.ray.material.color.setHex(hit ? 0x66ffff : 0xffffff)
+        if (hit) hovered.add(hit.object)
+      }
+      for (const target of targets) {
+        target.object.material.color.setHex(hovered.has(target.object) ? 0x66ffff : 0xffffff)
+      }
+    },
+    dispose() {
+      if (disposed) return
+      disposed = true
+      for (const entry of controllers) {
+        entry.controller.removeEventListener('connected', entry.onConnected)
+        entry.controller.removeEventListener('disconnected', entry.onDisconnected)
+        entry.controller.removeEventListener('select', entry.onSelect)
+        entry.ray.removeFromParent()
+        entry.controller.removeFromParent()
+      }
+      for (const target of targets) {
+        target.object.material.color.setHex(0xffffff)
+        target.object.removeFromParent()
+      }
+      resources.forEach(resource => resource.dispose())
+      controllers.length = 0
+      targets.length = 0
+    }
+  }
+  // Register disposal before allocating, so interrupted/failed setup is cleaned too.
+  state.interaction = interaction
+  const own = resource => { resources.push(resource); return resource }
+  const canvas = document.createElement('canvas')
+  canvas.width = 1024
+  canvas.height = 256
+  const context = canvas.getContext('2d')
+  context.fillStyle = '#160b2b'
+  context.fillRect(0, 0, 1024, 256)
+  context.strokeStyle = '#85ffff'
+  context.lineWidth = 10
+  context.strokeRect(5, 5, 1014, 246)
+  context.fillStyle = '#ffffff'
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  context.font = 'bold 66px sans-serif'
+  context.fillText('EXIT TO PORTAL', 512, 105)
+  context.font = '30px sans-serif'
+  context.fillText('Point here and press trigger', 512, 182)
+  const texture = own(new THREE.CanvasTexture(canvas))
+  texture.colorSpace = THREE.SRGBColorSpace
+  const button = new THREE.Mesh(own(new THREE.PlaneGeometry(1, 0.25)),
+    own(new THREE.MeshBasicMaterial({ map: texture, transparent: true,
+      depthTest: false, depthWrite: false, toneMapped: false })))
+  button.name = 'xr-exit-to-portal'
+  button.position.set(0, -0.35, -2)
+  button.renderOrder = 10000
+  state.origin.add(button)
+  interaction.addTarget(button, () => window.returnToPortal())
+
+  for (let index = 0; index < 2; index++) {
+    const controller = state.renderer.xr.getController(index)
+    const geometry = own(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(), new THREE.Vector3(0, 0, -1)
+    ]))
+    const ray = new THREE.Line(geometry, own(new THREE.LineBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.8,
+      depthTest: false, depthWrite: false, toneMapped: false
+    })))
+    ray.name = 'xr-controller-ray'
+    ray.visible = false
+    ray.renderOrder = 10001
+    const entry = { controller, ray, connected: false }
+    entry.onConnected = event => {
+      entry.connected = event.data.targetRayMode === 'tracked-pointer' && !event.data.hand
+    }
+    entry.onDisconnected = () => {
+      entry.connected = false
+      interaction.update()
+    }
+    entry.onSelect = () => {
+      const hit = pick(entry)
+      if (hit) targets.find(target => target.object === hit.object)?.onSelect()
+    }
+    controllers.push(entry)
+    controller.addEventListener('connected', entry.onConnected)
+    controller.addEventListener('disconnected', entry.onDisconnected)
+    controller.addEventListener('select', entry.onSelect)
+    controller.add(ray)
+    state.origin.add(controller)
+  }
+  return interaction
+}
+
 function finishVR(state) {
   if (xrState !== state || state.attaching || (state.session && !state.ended)) return
+  state.interaction?.dispose()
+  state.interaction = null
   pauseVRSoundtrack(state)
   state.soundtrack = null
   state.session?.removeEventListener('end', state.onEnd)
@@ -530,6 +656,7 @@ async function enterActiveWorldVR() {
     camera.quaternion.identity()
     state.origin.updateMatrixWorld(true)
 
+    createXRControllerInteraction(state)
     state.attaching = true
     await state.renderer.xr.setSession(state.session)
     state.attaching = false
