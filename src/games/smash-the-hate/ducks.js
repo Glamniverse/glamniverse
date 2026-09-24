@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { CONFIG as C } from './config.js'
-import { duckSpawnAt, duckEndAt, duckZ } from './level.js'
+import { duckSpawnAt, duckEndAt, duckZ, duckCrossAt } from './level.js'
 import { makePanel } from './ui.js'
 
 // Baseline is a scalar copy, never the mutable tracked head vector.
@@ -42,8 +42,8 @@ export function createDucks(root, events, onResult) {
       }
       if (!active) return
       group.position.set(0, judge.clearance(), duckZ(active, time))
-      const start = active.crossAt - C.duckCrossingSeconds / 2
-      const end = active.crossAt + C.duckCrossingSeconds / 2
+      const start = duckCrossAt(active) - C.duckCrossingSeconds / 2
+      const end = duckCrossAt(active) + C.duckCrossingSeconds / 2
       if (!judged && time >= start && time <= end) judge.sample(head.y)
       if (!judged && time > end) {
         judged = true; const success = judge.success()

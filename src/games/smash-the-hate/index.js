@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { CONFIG as C } from './config.js'
-import { DEMO_LEVEL as level, validateLevel } from './level.js'
+import { FULL_LEVEL as level, validateLevel } from './level.js'
+import { classifyResult, CHARACTER_STATES } from './results.js'
 import { createArena } from './arena.js'
 import { createUI, makePanel } from './ui.js'
 import { createTargets } from './targets.js'
@@ -28,6 +29,8 @@ export function createSmashTheHate({ audio, back }) {
     else { score.duckMisses++; if (C.duckBreaksCombo) score.combo = 0 }
     updateScore()
   })
+  let replaySeed = 0
+  let result = null
   let phase = 'loading'
   let xr = null
   let weapons = null
@@ -56,11 +59,11 @@ export function createSmashTheHate({ audio, back }) {
   }
   function readyMenu() {
     if (!xr) {
-      show(['SMASH THE HATE', 'Quest controller prototype • 60-second test chart', 'Use ENTER VR to play. No desktop gameplay.'])
+      show(['SMASH THE HATE', 'I Am Confident - full-song workout', 'Use ENTER VR to play. No desktop gameplay.'])
     } else if (phase === 'loading') {
       show(['SMASH THE HATE', audio.error ? 'Audio could not load. Check connection.' : 'Loading I Am Confident…'], audio.error ? 'RETRY LOAD' : null)
     } else {
-      show(['SMASH THE HATE • TEMPORARY DEMO', 'Swing gently. Duck under cyan frames.', 'Left: keyboard • Right: mouse (configurable)', healthy ? 'Misses are harmless. 60s: 8 cards + 3 duck frames.' : 'Track both controllers to begin.'], healthy ? 'START' : null)
+      show(['SMASH THE HATE - I AM CONFIDENT', 'Swing gently. Duck under cyan frames.', 'Left: keyboard • Right: mouse (configurable)', healthy ? 'Misses are harmless. 3:02: 110 cards + 5 duck frames.' : 'Track both controllers to begin.'], healthy ? 'START' : null)
     }
   }
   function pause(reason) {
@@ -72,13 +75,14 @@ export function createSmashTheHate({ audio, back }) {
   }
   function finish() {
     if (phase === 'results' || phase === 'disposed') return
-    token++; audio.pause(); weapons?.reset(); targets.hide(); obstacles.hide(); fragments.reset()
+    token++; audio.pause(); weapons?.reset(); targets.hide(); obstacles.hide(); fragments.reset(); arena.reset()
     phase = 'results'; xr?.interaction.setMenuRays(true)
     // Any unjudged chart entries become misses if the source ends unexpectedly early.
     score.misses += Math.max(0, level.events.length - score.hits - score.misses)
-    const win = score.hits / level.events.length >= C.winHitRate
-    show(win ? ['YOU HEALED THE WORLD', 'FROM ONLINE BULLYING.', `Score ${score.score} | Hits ${score.hits} | Misses ${score.misses}`, `Max combo ${score.maxCombo} | Ducks ${score.ducks}/3 | 60s TEST`]
-      : ['YOU WERE BULLIED ONLINE.', `Score ${score.score} | Hits ${score.hits} | Misses ${score.misses}`, `Max combo ${score.maxCombo} | Ducks ${score.ducks}/3`, 'TEMPORARY 60s CHART - Try again!'], 'PLAY AGAIN')
+    result = classifyResult(score, level.events.length, audio.currentTime, level.duration)
+    const { win, characterState } = result
+    show(win ? ['YOU HEALED THE WORLD', 'FROM ONLINE BULLYING.', `Score ${score.score} | Hits ${score.hits} | Misses ${score.misses}`, `Max combo ${score.maxCombo} | Ducks ${score.ducks}/${level.ducks.length}`, CHARACTER_STATES[characterState].placeholder]
+      : ['YOU WERE BULLIED ONLINE.', `Score ${score.score} | Hits ${score.hits} | Misses ${score.misses}`, `Max combo ${score.maxCombo} | Ducks ${score.ducks}/${level.ducks.length}`, CHARACTER_STATES[characterState].placeholder], 'PLAY AGAIN')
   }
   async function playAudio() {
     const attempt = ++token
@@ -114,7 +118,7 @@ export function createSmashTheHate({ audio, back }) {
     if (!['ready', 'results'].includes(phase) || !music.ready()) return
     for (const key of Object.keys(score)) score[key] = 0
     token++; audio.pause(); audio.currentTime = 0; songTime = 0
-    targets.reset(); fragments.reset(); weapons.reset()
+    result = null; targets.reset(++replaySeed); fragments.reset(); weapons.reset(); arena.reset()
     placePlayArea() // Fixed front direction for the whole round, never follows gaze.
     obstacles.reset(0) // root was just placed at neutral eyes; frozen for this round.
     beginCountdown()
@@ -155,14 +159,14 @@ export function createSmashTheHate({ audio, back }) {
     if (xr && onVisibility) xr.session.removeEventListener('visibilitychange', onVisibility)
     onVisibility = null
     ui.unbind(); weapons?.dispose(); weapons = null
-    targets.reset(); obstacles.reset(); fragments.reset(); hud.mesh.visible = false; music.release()
+    targets.reset(); obstacles.reset(); fragments.reset(); arena.reset(); result = null; hud.mesh.visible = false; music.release()
     xr = null; calibrated = healthy = false; lastTime = null
     if (!disposed) { phase = music.ready() ? 'ready' : 'loading'; readyMenu() }
   }
   return {
     scene, camera,
     // Read-only snapshot for tests/debugging; never called in the hot frame loop.
-    getDebugState: () => ({ phase, ...score, songTime, healthy, activeTargets: targets.entries.filter(t => t.event).length, ...obstacles.stats(), ...arena.stats(), renderer: xr?.renderer.info ? { ...xr.renderer.info.render, ...xr.renderer.info.memory } : null }),
+    getDebugState: () => ({ phase, ...score, songTime, healthy, result, replaySeed, activeTargets: targets.entries.filter(t => t.event).length, ...obstacles.stats(), ...arena.stats(), renderer: xr?.renderer.info ? { ...xr.renderer.info.render, ...xr.renderer.info.memory } : null }),
     update(time, frame) {
       if (disposed) return
       if (Number.isFinite(time)) now = time / 1000
@@ -188,13 +192,14 @@ export function createSmashTheHate({ audio, back }) {
         head.copy(headWorld); root.worldToLocal(head)
       }
       if (phase === 'playing' && pose && visible) {
-        if (audio.paused || audio.readyState < 3) pause('Music paused or buffering.')
-        else if (audio.currentTime + 0.05 < songTime) pause('Unexpected audio seek. Exit and restart the demo.')
+        if (audio.ended) finish()
+        else if (audio.paused || audio.readyState < 3) pause('Music paused or buffering.')
+        else if (audio.currentTime + 0.05 < songTime) pause('Unexpected audio seek. Exit and restart the round.')
         else {
           songTime = audio.currentTime
           targets.update(songTime, head)
           obstacles.update(songTime, head)
-          if (songTime >= level.duration) finish()
+          // Finish on media ended, never cut the supplied master at a chart timestamp.
         }
       }
       const wasHealthy = healthy

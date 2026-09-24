@@ -1,33 +1,35 @@
 import * as THREE from 'three'
 import { CONFIG as C } from './config.js'
-import { spawnAt, missAt, cardZ } from './level.js'
+import { COMMENTS, selectComments } from './comments.js'
+import { spawnAt, missAt, cardZ, laneX } from './level.js'
 
 export function createTargets(root, level, onMiss) {
-  // One pre-rendered atlas. Each pooled material gets a small texture view;
-  // no canvas updates, text layout or geometry creation during the round.
-  const strings = [...new Set(level.events.map(event => event.text))]
-  const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256 * strings.length
+  // One compact atlas shared by ALL six cards, not six full-size texture copies.
+  const columns = 4; const tileWidth = 512; const tileHeight = 128
+  const rows = Math.ceil(COMMENTS.length / columns)
+  const canvas = document.createElement('canvas'); canvas.width = columns * tileWidth; canvas.height = rows * tileHeight
   const ctx = canvas.getContext('2d')
-  strings.forEach((text, i) => {
-    const y = i * 256
-    ctx.fillStyle = '#10091e'; ctx.fillRect(0, y, 1024, 256)
-    ctx.strokeStyle = i % 2 ? '#62cfff' : '#eb63ef'; ctx.lineWidth = 12; ctx.strokeRect(6, y + 6, 1012, 244)
-    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 72px sans-serif'
-    ctx.fillText(text, 512, y + 128, 950)
+  COMMENTS.forEach((text, i) => {
+    const x = i % columns * tileWidth; const y = Math.floor(i / columns) * tileHeight
+    ctx.fillStyle = '#10091e'; ctx.fillRect(x, y, tileWidth, tileHeight)
+    ctx.strokeStyle = i % 2 ? '#62cfff' : '#eb63ef'; ctx.lineWidth = 6; ctx.strokeRect(x + 4, y + 4, tileWidth - 8, tileHeight - 8)
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 36px sans-serif'
+    ctx.fillText(text, x + tileWidth / 2, y + tileHeight / 2, tileWidth - 30)
   })
-  const geometry = new THREE.PlaneGeometry(C.cardWidth, C.cardHeight)
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace
+  texture.generateMipmaps = false; texture.minFilter = THREE.LinearFilter
+  const material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
   const entries = Array.from({ length: C.maxTargets }, () => {
-    const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace
-    texture.generateMipmaps = false; texture.minFilter = THREE.LinearFilter
-    texture.repeat.y = 1 / strings.length
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }))
+    // Tiny private UV buffer; material and texture remain shared.
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(C.cardWidth, C.cardHeight), material)
     mesh.visible = false; root.add(mesh)
     return { mesh, event: null, position: mesh.position, previous: new THREE.Vector3() }
   })
+  let selected = selectComments(level.events.length, 1)
   let next = 0
   return {
     entries,
-    reset() { next = 0; for (const entry of entries) { entry.event = null; entry.mesh.visible = false } },
+    reset(seed = 1) { selected = selectComments(level.events.length, seed); next = 0; for (const entry of entries) { entry.event = null; entry.mesh.visible = false } },
     hide() { for (const entry of entries) { entry.event = null; entry.mesh.visible = false } },
     consume(entry) { if (!entry.event) return false; entry.event = null; entry.mesh.visible = false; return true },
     update(time, head) {
@@ -45,10 +47,17 @@ export function createTargets(root, level, onMiss) {
         const entry = entries.find(item => !item.event)
         if (!entry) throw new Error('Target pool exhausted; chart/config overlap is invalid')
         entry.event = event; entry.mesh.visible = true
-        entry.position.set(event.lane * C.laneOffset, -C.targetBelowEyes, cardZ(event, time))
+        entry.position.set(laneX(event.lane), -C.targetBelowEyes, cardZ(event, time))
         entry.previous.copy(entry.position)
         entry.mesh.rotation.y = 0
-        entry.mesh.material.map.offset.y = 1 - (strings.indexOf(event.text) + 1) / strings.length
+        const tile = selected[next - 1]
+        const u = (tile % columns) / columns; const v = 1 - (Math.floor(tile / columns) + 1) / rows
+        const uv = entry.mesh.geometry.attributes.uv
+        // Half-pixel inset prevents neighbouring text bleeding at tile edges.
+        const dx = 0.5 / canvas.width; const dy = 0.5 / canvas.height
+        uv.setXY(0, u + dx, v + 1 / rows - dy); uv.setXY(1, u + 1 / columns - dx, v + 1 / rows - dy)
+        uv.setXY(2, u + dx, v + dy); uv.setXY(3, u + 1 / columns - dx, v + dy)
+        uv.needsUpdate = true
       }
     },
   }

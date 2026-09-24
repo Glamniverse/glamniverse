@@ -2,13 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
 import { CONFIG as C } from '../src/games/smash-the-hate/config.js'
-import { DEMO_LEVEL, validateLevel, spawnAt, missAt, cardZ, duckSpawnAt, duckEndAt, duckZ, cardSpeed } from '../src/games/smash-the-hate/level.js'
+import { FULL_LEVEL, validateLevel, spawnAt, missAt, cardZ, duckSpawnAt, duckEndAt, duckZ, cardSpeed, strikeAt, chartLimits, laneX, arrivalAt } from '../src/games/smash-the-hate/level.js'
 import { sweptCardHit, isSwing } from '../src/games/smash-the-hate/collision.js'
 import { createTargets } from '../src/games/smash-the-hate/targets.js'
 import { createWeapons } from '../src/games/smash-the-hate/weapons.js'
 import { createSmashTheHate } from '../src/games/smash-the-hate/index.js'
 import { createArena } from '../src/games/smash-the-hate/arena.js'
 import { createDuckJudge, createDucks } from '../src/games/smash-the-hate/ducks.js'
+import { createMusicWaves } from '../src/games/smash-the-hate/waves.js'
+import { COMMENTS, selectComments } from '../src/games/smash-the-hate/comments.js'
+import { classifyResult } from '../src/games/smash-the-hate/results.js'
+import { readFileSync } from 'node:fs'
 import { pulseHaptic } from '../src/games/smash-the-hate/effects.js'
 
 // No WebGL, browser or XR hardware: exercise real Three.js transforms/game logic
@@ -17,11 +21,12 @@ const ctx = { fillRect() {}, strokeRect() {}, fillText() {} }
 globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) }
 globalThis.window = { innerWidth: 1200, innerHeight: 800 }
 class FakeAudio extends EventTarget {
+  ended = false; duration = 182.4;
   paused = true; loop = true; volume = 0.43; readyState = 4; currentTime = 0; error = null; src = ''; plays = 0; rejectNext = false
   getAttribute() { return this.src }
   load() {}
   pause() { this.paused = true }
-  play() { this.plays++; if (this.rejectNext) { this.rejectNext = false; return Promise.reject(new Error('Autoplay test')) } this.paused = false; return Promise.resolve() }
+  play() { this.ended = false; this.plays++; if (this.rejectNext) { this.rejectNext = false; return Promise.reject(new Error('Autoplay test')) } this.paused = false; return Promise.resolve() }
 }
 const flush = () => new Promise(resolve => setImmediate(resolve))
 function harness() {
@@ -49,7 +54,13 @@ function harness() {
   let time = 0
   function tick(dt = 1 / 72) {
     time += dt
-    if (!audio.paused) audio.currentTime += dt
+    if (!audio.paused) {
+      audio.currentTime += dt
+      if (audio.currentTime >= audio.duration) {
+        audio.currentTime = audio.duration; audio.ended = true; audio.paused = true
+        audio.dispatchEvent(new Event('ended'))
+      }
+    }
     game.update(time * 1000, frame)
   }
   game.xrHooks.onEnter(xr); game.update(0, frame)
@@ -63,17 +74,18 @@ function harness() {
   }
 }
 
-test('demo map has eight events, correct approach and at most two active cards', () => {
-  validateLevel(DEMO_LEVEL)
-  assert.equal(DEMO_LEVEL.events.length, 8)
-  for (let t = 0; t <= DEMO_LEVEL.duration; t += 1 / 90) {
-    assert.ok(DEMO_LEVEL.events.filter(e => spawnAt(e) <= t && missAt(e) > t).length <= 2)
+test('full chart has 110 hits with at most six total and two near cards', () => {
+  validateLevel(FULL_LEVEL)
+  assert.equal(FULL_LEVEL.events.length, 110)
+  for (let t = 0; t <= FULL_LEVEL.duration; t += 1 / 90) {
+    assert.ok(FULL_LEVEL.events.filter(e => spawnAt(e) <= t && missAt(e) > t).length <= C.maxTargets)
+    assert.ok(FULL_LEVEL.events.filter(e => strikeAt(e) <= t && missAt(e) > t).length <= C.maxStrikeTargets)
   }
-  const e = DEMO_LEVEL.events[0]
-  assert.equal(cardZ(e, spawnAt(e)), -C.spawnDistance)
+  const e = FULL_LEVEL.events[0]
+  assert.equal(cardZ(e, spawnAt(e)), -C.portalDistance)
   assert.ok(Math.abs(cardZ(e, e.hitAt) + C.hitDistance) < 1e-9)
   assert.ok(Math.abs(cardZ(e, missAt(e)) - C.missBehind) < 1e-9)
-  assert.throws(() => validateLevel({ ...DEMO_LEVEL, events: [...DEMO_LEVEL.events, DEMO_LEVEL.events[0]] }))
+  assert.throws(() => validateLevel({ ...FULL_LEVEL, events: [...FULL_LEVEL.events, FULL_LEVEL.events[0]] }))
 })
 
 test('swept collision catches crossing but speed gate rejects stationary, slow and tracking jumps', () => {
@@ -89,14 +101,14 @@ test('swept collision catches crossing but speed gate rejects stationary, slow a
 
 test('pooled cards miss once, consume once, and reset without growing scene', () => {
   const root = new THREE.Group(); let misses = 0
-  const targets = createTargets(root, DEMO_LEVEL, () => misses++)
+  const targets = createTargets(root, FULL_LEVEL, () => misses++)
   const head = new THREE.Vector3()
-  targets.update(4, head); const target = targets.entries.find(t => t.event)
+  targets.update(spawnAt(FULL_LEVEL.events[0]) + .01, head); const target = targets.entries.find(t => t.event)
   assert.ok(target); assert.equal(targets.consume(target), true); assert.equal(targets.consume(target), false)
-  for (let t = 4; t <= DEMO_LEVEL.duration; t += 1 / 72) targets.update(t, head)
-  assert.equal(misses, 7); assert.equal(root.children.length, 2)
-  targets.reset(); targets.update(4, head); assert.equal(targets.entries.filter(t => t.event).length, 1)
-  assert.equal(root.children.length, 2)
+  for (let t = spawnAt(FULL_LEVEL.events[0]) + .01; t <= FULL_LEVEL.duration; t += 1 / 72) targets.update(t, head)
+  assert.equal(misses, 109); assert.equal(root.children.length, C.maxTargets)
+  targets.reset(); targets.update(spawnAt(FULL_LEVEL.events[0]) + .01, head); assert.equal(targets.entries.filter(t => t.event).length, 1)
+  assert.equal(root.children.length, C.maxTargets)
 })
 
 test('actual weapon pipeline rejects passive overlap, hits once and resets on tracking loss', () => {
@@ -125,9 +137,9 @@ test('actual weapon pipeline rejects passive overlap, hits once and resets on tr
 test('countdown, whole missed demo, results, replay, back and session cleanup', async () => {
   const h = harness(); assert.equal(h.game.getDebugState().phase, 'ready')
   await h.start(); assert.equal(h.game.getDebugState().phase, 'playing'); assert.equal(h.xr.interaction.rays, false)
-  for (let i = 0; i < DEMO_LEVEL.duration * 72 + 2; i++) h.tick()
+  for (let i = 0; i < FULL_LEVEL.duration * 72 + 2; i++) h.tick()
   const result = h.game.getDebugState()
-  assert.equal(result.duckMisses, 3); assert.equal(result.activeObstacle, false); assert.equal(result.phase, 'results'); assert.equal(result.misses, 8); assert.equal(result.hits, 0)
+  assert.equal(result.duckMisses, 5); assert.equal(result.activeObstacle, false); assert.equal(result.phase, 'results'); assert.equal(result.misses, 110); assert.equal(result.hits, 0)
   assert.equal(h.audio.paused, true); assert.equal(h.xr.interaction.rays, true)
   h.registered[0].action(); assert.equal(h.game.getDebugState().phase, 'countdown'); assert.equal(h.game.getDebugState().misses, 0); assert.equal(h.game.getDebugState().duckMisses, 0)
   h.registered[1].action(); assert.equal(h.backs(), 1); assert.equal(h.registered.length, 0)
@@ -159,7 +171,7 @@ test('optional haptics tolerate unsupported/rejected devices', async () => {
 
 test('game awards weighted keyboard points once and preserves combo in results', async () => {
   const h = harness(); await h.start()
-  while (h.audio.currentTime < 5.9) h.tick()
+  while (h.audio.currentTime < FULL_LEVEL.events[0].hitAt - .1) h.tick()
   h.controllers[0].grip.position.z -= .06
   h.tick()
   assert.equal(h.game.getDebugState().hits, 1)
@@ -186,10 +198,10 @@ test('buffering and long frame gaps pause; stale playback promise cannot restart
 
 
 test('faster approach retains anticipation and doubles original speed', () => {
-  const e = DEMO_LEVEL.events[0]
+  const e = FULL_LEVEL.events[0]
   assert.equal(C.readSeconds, .9)
   assert.equal(C.travelSeconds, 1.4)
-  assert.equal(cardZ(e, spawnAt(e) + C.readSeconds), -C.spawnDistance)
+  assert.equal(cardZ(e, spawnAt(e) + C.portalLeadSeconds + C.readSeconds), -C.spawnDistance)
   assert.equal(cardSpeed(), 2 * (C.spawnDistance - C.hitDistance) / 2.8)
 })
 
@@ -207,29 +219,29 @@ test('duck baseline freezes for seated/standing and requires whole window cleara
 })
 
 test('all duck windows exclude cards; invalid overlap rejected', () => {
-  validateLevel(DEMO_LEVEL)
-  assert.equal(DEMO_LEVEL.ducks.length, 3)
-  for (const d of DEMO_LEVEL.ducks) {
-    assert.equal(duckZ(d, duckSpawnAt(d) + C.duckWarningSeconds), -C.duckSpawnDistance)
-    assert.equal(duckZ(d, d.crossAt), 0)
-    for (const c of DEMO_LEVEL.events) assert.ok(missAt(c) <= duckSpawnAt(d) || spawnAt(c) >= duckEndAt(d))
+  validateLevel(FULL_LEVEL)
+  assert.equal(FULL_LEVEL.ducks.length, 5)
+  for (const d of FULL_LEVEL.ducks) {
+    assert.ok(Math.abs(duckZ(d, duckSpawnAt(d) + C.portalLeadSeconds + C.duckWarningSeconds) + C.duckSpawnDistance) < 1e-8)
+    assert.ok(Math.abs(duckZ(d, d.crossAt)) < 1e-8)
+    for (const c of FULL_LEVEL.events) assert.ok(missAt(c) <= duckSpawnAt(d) || spawnAt(c) >= duckEndAt(d))
   }
-  assert.throws(() => validateLevel({ ...DEMO_LEVEL, ducks: [{ ...DEMO_LEVEL.ducks[0], crossAt: 10 }] }), /overlap/)
+  assert.throws(() => validateLevel({ ...FULL_LEVEL, ducks: [{ ...FULL_LEVEL.ducks[0], crossAt: 12 }] }), /overlap/)
 })
 
 test('pooled duck success/miss once, replay reset and hide', () => {
   const root = new THREE.Group(); const outcomes = []
-  const ducks = createDucks(root, DEMO_LEVEL.ducks, success => outcomes.push(success))
+  const ducks = createDucks(root, FULL_LEVEL.ducks, success => outcomes.push(success))
   const head = new THREE.Vector3(0, -.25, 0)
   ducks.reset(0)
-  for (let t = 0; t < 60; t += 1 / 72) ducks.update(t, head)
-  assert.deepEqual(outcomes, [true, true, true])
+  for (let t = 0; t < FULL_LEVEL.duration; t += 1 / 72) ducks.update(t, head)
+  assert.deepEqual(outcomes, [true, true, true, true, true])
   assert.equal(ducks.stats().activeObstacle, false)
   ducks.reset(0); head.y = 0
-  for (let t = 0; t < 60; t += 1 / 72) ducks.update(t, head)
-  assert.deepEqual(outcomes, [true, true, true, false, false, false])
+  for (let t = 0; t < FULL_LEVEL.duration; t += 1 / 72) ducks.update(t, head)
+  assert.deepEqual(outcomes, [true, true, true, true, true, false, false, false, false, false])
   assert.equal(root.children.length, 1)
-  ducks.reset(); ducks.update(duckSpawnAt(DEMO_LEVEL.ducks[0]), head)
+  ducks.reset(); ducks.update(duckSpawnAt(FULL_LEVEL.ducks[0]), head)
   ducks.hide(); assert.equal(ducks.stats().activeObstacle, false)
 })
 
@@ -242,14 +254,14 @@ test('late panorama load cannot reattach after disposal; environment budget stay
   THREE.TextureLoader.prototype.load = (url, done) => { complete = done; return texture }
   try {
     const scene = new THREE.Scene(); const arena = createArena(scene)
-    arena.update(10, 'playing')
+    arena.update(1, 'playing')
     let calls = 0; let triangles = 0
     scene.traverseVisible(o => {
       if (!o.isMesh) return
       calls++
       triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1)
     })
-    assert.equal(arena.stats().decorativeNotes, 48)
+    assert.equal(arena.stats().activeWaveNotes, C.waveNotes)
     assert.ok(calls <= 12); assert.ok(triangles < 12000)
     console.log(`Arena-only upper estimate: ${calls} draws/eye, ${triangles} triangles/eye; 2 textures with panorama loaded.`)
     arena.dispose(); complete(texture)
@@ -259,4 +271,137 @@ test('late panorama load cannot reattach after disposal; environment budget stay
     THREE.TextureLoader.prototype.load = original
     delete document.createElementNS
   }
+})
+
+
+test('measured local master duration matches full chart (Xing frames and gapless trim)', () => {
+  const bytes = readFileSync(new URL('../public/audio/smash-the-hate/i-am-confident.mp3', import.meta.url))
+  const xing = bytes.indexOf('Xing'); assert.ok(xing > 0)
+  const frames = bytes.readUInt32BE(xing + 8)
+  const tag = bytes.indexOf('Lavc', xing); assert.ok(tag > xing)
+  const trim = bytes.readUIntBE(tag + 21, 3)
+  const seconds = (frames * 1152 - (trim >>> 12) - (trim & 4095)) / 48000
+  assert.equal(seconds, FULL_LEVEL.duration)
+})
+
+test('physical chart is deterministic, section-bounded and independent of text seeds', () => {
+  const snapshot = JSON.stringify(FULL_LEVEL)
+  const a = selectComments(110, 1); const b = selectComments(110, 2)
+  assert.deepEqual(a, selectComments(110, 1)); assert.notDeepEqual(a, b)
+  for (let i = 1; i < a.length; i++) assert.notEqual(a[i], a[i - 1])
+  assert.equal(JSON.stringify(FULL_LEVEL), snapshot)
+  assert.equal(COMMENTS.length, 43)
+  for (const section of FULL_LEVEL.sections) {
+    const entries = FULL_LEVEL.events.filter(e => e.section === section.name)
+    for (const e of entries) {
+      assert.ok(spawnAt(e) >= section.start - 1e-8)
+      assert.ok(missAt(e) <= section.end)
+      assert.ok(Math.abs(laneX(e.lane)) <= .58)
+    }
+  }
+  assert.deepEqual(chartLimits(FULL_LEVEL), { pooled: 6, near: 2 })
+  assert.throws(() => validateLevel({ ...FULL_LEVEL, events: [{ ...FULL_LEVEL.events[0], lane: 'BEHIND' }] }), /lane/)
+})
+
+test('total and strike-area limits are independently enforced and chart offset moves every timeline', () => {
+  const original = C.chartOffsetSeconds
+  try {
+    C.chartOffsetSeconds = .1
+    validateLevel(FULL_LEVEL)
+    const e = FULL_LEVEL.events[0]
+    assert.equal(arrivalAt(e), e.hitAt + .1)
+    assert.ok(Math.abs(cardZ(e, arrivalAt(e)) + C.hitDistance) < 1e-8)
+    assert.ok(Math.abs(duckZ(FULL_LEVEL.ducks[0], FULL_LEVEL.ducks[0].crossAt + .1)) < 1e-8)
+  } finally { C.chartOffsetSeconds = original }
+  const three = ['L', 'R', 'L_OUT'].map((lane, i) => ({ id: 'near-' + i, lane, hitAt: 10 }))
+  assert.throws(() => validateLevel({ duration: 182.4, events: three, ducks: [] }), /near strike/)
+  const seven = Array.from({length: 7}, (_, i) => ({ id: 'total-' + i, lane: 'L', hitAt: 10 + i * .51 }))
+  assert.throws(() => validateLevel({ duration: 182.4, events: seven, ducks: [] }), /total target/)
+})
+
+test('shared atlas stays bounded; six-card updates respect near limits even when every card misses', () => {
+  const root = new THREE.Group(); const targets = createTargets(root, FULL_LEVEL, () => {})
+  targets.reset(42)
+  assert.equal(new Set(targets.entries.map(e => e.mesh.material)).size, 1)
+  const map = targets.entries[0].mesh.material.map
+  assert.equal(map.image.width, 2048); assert.equal(map.image.height, 1408)
+  const head = new THREE.Vector3()
+  for (let t = 0; t < FULL_LEVEL.duration; t += 1 / 72) {
+    targets.update(t, head)
+    const active = targets.entries.filter(e => e.event)
+    assert.ok(active.length <= 6)
+    assert.ok(active.filter(e => e.position.z >= -C.strikeAreaDistance).length <= 2)
+  }
+  assert.equal(targets.entries.filter(e => e.event).length, 0)
+})
+
+test('musical waves pool/reset and never enter the body corridor', () => {
+  const root = new THREE.Group(); const waves = createMusicWaves(root, FULL_LEVEL.waves)
+  const mesh = root.children[0]; const matrix = new THREE.Matrix4(); const point = new THREE.Vector3()
+  for (let t = 0; t < FULL_LEVEL.duration; t += .1) {
+    waves.update(t, true)
+    assert.ok(waves.stats().activeWaveNotes <= C.maxWaveNotes)
+    if (!mesh.visible) continue
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, matrix); point.setFromMatrixPosition(matrix)
+      const m = matrix.elements
+      const halfX = (Math.abs(m[0]) + Math.abs(m[4]) + Math.abs(m[8])) / 2
+      assert.ok(Math.abs(point.x) - halfX >= C.waveClearance - .001)
+    }
+  }
+  waves.update(1, true); assert.equal(mesh.visible, true)
+  waves.update(1, false); assert.equal(mesh.visible, false)
+  waves.update(1, true); waves.reset(); assert.equal(mesh.visible, false)
+  waves.update(1, true); assert.equal(mesh.visible, true); assert.equal(root.children.length, 1)
+})
+
+test('result success uses hit and completion rates, never weapon points', () => {
+  assert.equal(classifyResult({hits: 66, score: 6600}, 110, 182.4, 182.4).win, true)
+  assert.equal(classifyResult({hits: 65, score: 999999}, 110, 182.4, 182.4).win, false)
+  assert.equal(classifyResult({hits: 110, score: 999999}, 110, 90, 182.4).win, false)
+  assert.equal(classifyResult({hits: 66}, 110, 182.4, 182.4).characterState, 'confident')
+})
+
+test('audio tail is not cut at chart duration; early-ended state cannot win and replay is clean', async () => {
+  const h = harness(); h.audio.duration = 183
+  await h.start()
+  while (h.audio.currentTime < 182.5) h.tick()
+  assert.equal(h.game.getDebugState().phase, 'playing')
+  while (!h.audio.ended) h.tick()
+  assert.equal(h.game.getDebugState().phase, 'results')
+  const seed = h.game.getDebugState().replaySeed
+  h.registered[0].action()
+  assert.equal(h.game.getDebugState().replaySeed, seed + 1)
+  assert.equal(h.game.getDebugState().result, null)
+  assert.equal(h.game.getDebugState().activeWaveNotes, 0)
+  h.game.xrHooks.onExit(); h.game.xrHooks.onEnter(h.xr); h.tick()
+  h.registered[0].action()
+  for (let i = 0; i < 218; i++) h.tick()
+  await flush()
+  h.audio.currentTime = 30; h.audio.dispatchEvent(new Event('ended'))
+  assert.equal(h.game.getDebugState().result.win, false)
+  h.registered[0].action(); assert.equal(h.game.getDebugState().misses, 0)
+  h.game.xrHooks.onExit(); h.game.xrHooks.dispose()
+})
+
+
+test('full-scene allocation budget is bounded and no content is allocated on replay', async () => {
+  const h = harness()
+  const count = () => {
+    let draws = 0; let triangles = 0; const textures = new Set()
+    h.game.scene.traverse(o => {
+      if (o.isMesh) {
+        draws++; triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1)
+        if (o.material.map) textures.add(o.material.map)
+      }
+    })
+    return { draws, triangles, textures: textures.size + 1 } // plus browser-loaded panorama
+  }
+  const before = count()
+  await h.start()
+  h.audio.dispatchEvent(new Event('ended')); h.registered[0].action()
+  assert.deepEqual(count(), before)
+  assert.ok(before.draws < 40); assert.ok(before.triangles < 12000); assert.ok(before.textures <= 10)
+  console.log('Conservative allocated scene budget (includes mutually hidden menus/weapons/cards):', before)
+  h.game.xrHooks.onExit(); h.game.xrHooks.dispose()
 })
