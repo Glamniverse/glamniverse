@@ -1,5 +1,6 @@
 import './style.css'
 import * as THREE from 'three'
+import { createSmashTheHate } from './games/smash-the-hate/index.js'
 
 document.querySelector('#app').innerHTML = `
   <main class="page">
@@ -160,6 +161,7 @@ document.querySelector('#app').innerHTML = `
       <button class="portal-label label-drive" onclick="enterDistrict('lateNightDrives')">
       🚗 Late Night Drives
       </button>
+      <button class="portal-label" style="left:50%;bottom:5%;top:auto;transform:translateX(-50%)" onclick="openSmashTheHate()">SMASH THE HATE • VR demo</button>
       <div id="district-confirm" class="district-confirm hidden">
       <h2 id="district-confirm-title">Enter In His Mind?</h2>
       <div class="district-confirm-buttons">
@@ -301,7 +303,7 @@ function renderActiveWorld(time, frame) {
   if (!world || !sharedRenderer) return
   if (xrState && !sharedRenderer.xr.isPresenting) return
 
-  world.update()
+  world.update(time, frame)
   xrState?.interaction?.update(time, frame)
   if (runtimeRunning && activeWorld === world) {
     sharedRenderer.render(world.scene, world.camera)
@@ -345,8 +347,8 @@ function resumeRuntime() {
   animateFrame()
 }
 
-function startWorldAnimation(worldId, scene, camera, update, xrMemory = null) {
-  activeWorld = { worldId, scene, camera, update, xrMemory }
+function startWorldAnimation(worldId, scene, camera, update, xrMemory = null, xrHooks = null) {
+  activeWorld = { worldId, scene, camera, update, xrMemory, xrHooks }
   resumeRuntime()
   updateVRControl()
 }
@@ -364,7 +366,7 @@ function disposeRuntimeRenderer() {
 
 // Stationary XR uses the shared runtime; the portal remains browser-only.
 const stationaryVRWorlds = new Set([
-  'inHisMind', 'neonTherapy', 'lateNightDrives', 'almostLove'
+  'inHisMind', 'neonTherapy', 'lateNightDrives', 'almostLove', 'smashTheHate'
 ])
 let vrSupported = false
 let vrButton = null
@@ -544,12 +546,13 @@ function createXRControllerInteraction(state) {
   const rotation = new THREE.Matrix4()
   let disposed = false
   let memoryPanel = null
+  let menuRays = true
   const enabled = () => !disposed && xrState === state && !state.cancelled &&
     !state.ended && !state.attaching && state.renderer.xr.isPresenting &&
     state.session.visibilityState === 'visible'
 
   function pick(entry) {
-    if (!enabled() || !entry.connected || !entry.controller.visible) return null
+    if (!menuRays || !enabled() || !entry.connected || !entry.controller.visible) return null
     entry.controller.updateWorldMatrix(true, false)
     raycaster.ray.origin.setFromMatrixPosition(entry.controller.matrixWorld)
     rotation.extractRotation(entry.controller.matrixWorld)
@@ -561,19 +564,25 @@ function createXRControllerInteraction(state) {
   }
 
   const interaction = {
+    controllers,
+    setMenuRays(value) { menuRays = value },
     addTarget(object, onSelect, options = {}) {
       const baseColor = object.material.color.clone()
       const target = { object, onSelect, owned: options.owned !== false,
         isEnabled: () => object.visible && (options.enabled?.() ?? true),
         onHover: options.onHover || (hovered => object.material.color.copy(hovered ? new THREE.Color(0x66ffff) : baseColor)) }
       targets.push(target)
+      return () => {
+        const index = targets.indexOf(target)
+        if (index !== -1) { target.onHover(false); targets.splice(index, 1) }
+      }
     },
     update(time, frame) {
-      locomotion.update(time, frame, controllers, enabled() && !memoryPanel?.visible)
+      locomotion.update(time, frame, controllers, enabled() && !memoryPanel?.visible && !state.world.xrHooks?.stationary)
       const hovered = new Set()
       for (const entry of controllers) {
         const hit = pick(entry)
-        entry.ray.visible = enabled() && entry.connected && entry.controller.visible
+        entry.ray.visible = menuRays && enabled() && entry.connected && entry.controller.visible
         entry.ray.scale.z = hit ? hit.distance : 5
         entry.ray.material.color.setHex(hit ? 0x66ffff : 0xffffff)
         if (hit) hovered.add(hit.object)
@@ -593,6 +602,7 @@ function createXRControllerInteraction(state) {
         entry.source = null
         entry.ray.removeFromParent()
         entry.controller.removeFromParent()
+        entry.grip?.removeFromParent()
       }
       for (const target of targets) {
         target.onHover(false)
@@ -634,6 +644,7 @@ function createXRControllerInteraction(state) {
   button.renderOrder = 10000
   state.origin.add(button)
   interaction.addTarget(button, () => window.returnToPortal())
+  button.visible = !state.world.xrHooks?.customUI
 
   const memory = state.world.xrMemory
   if (memory) {
@@ -724,7 +735,9 @@ function createXRControllerInteraction(state) {
     ray.name = 'xr-controller-ray'
     ray.visible = false
     ray.renderOrder = 10001
-    const entry = { controller, ray, connected: false }
+    const grip = state.world.xrHooks ? state.renderer.xr.getControllerGrip(index) : null
+    if (grip) state.origin.add(grip)
+    const entry = { controller, grip, ray, connected: false }
     entry.onConnected = event => {
       locomotion.reset()
       entry.source = event.data
@@ -751,6 +764,7 @@ function createXRControllerInteraction(state) {
 
 function finishVR(state) {
   if (xrState !== state || state.attaching || (state.session && !state.ended)) return
+  state.world.xrHooks?.onExit()
   state.interaction?.dispose()
   state.interaction = null
   pauseVRSoundtrack(state)
@@ -803,6 +817,7 @@ async function endVR(state) {
 function deferUntilVRExit(action) {
   if (!xrState) return false
   pauseVRSoundtrack(xrState)
+  xrState.world.xrHooks?.onRequestExit()
   xrState.cancelled = true
   xrState.afterExit = action
   // A pending request/setup must settle before its session or renderer is released.
@@ -818,7 +833,7 @@ async function enterActiveWorldVR() {
   activeWorldLifecycle.resetInput()
   xrState = state
   updateVRControl()
-  startVRSoundtrack(state)
+  if (!state.world.xrHooks?.ownsAudio) startVRSoundtrack(state)
 
   try {
     state.session = await navigator.xr.requestSession('immersive-vr')
@@ -849,6 +864,7 @@ async function enterActiveWorldVR() {
     state.origin.updateMatrixWorld(true)
 
     createXRControllerInteraction(state)
+    state.world.xrHooks?.onEnter(state)
     state.attaching = true
     await state.renderer.xr.setSession(state.session)
     state.attaching = false
@@ -867,6 +883,7 @@ let activeWorldLifecycle = null
 
 function disposeCurrentWorld() {
   // Detach the outgoing update before disposing its scene and input.
+  activeWorld?.xrHooks?.dispose()
   activeWorld = null
   activeWorldLifecycle?.dispose()
   activeWorldLifecycle = null
@@ -1101,6 +1118,7 @@ scene.add(stars)
 window.closePortalWorld = function () {
   if (deferUntilVRExit(() => window.closePortalWorld())) return
   stopWorldAnimation()
+  activeWorld?.xrHooks?.suspend()
   activeWorldLifecycle?.suspend()
   disposeRuntimeRenderer()
   selectedDistrict = null
@@ -1170,6 +1188,19 @@ window.confirmEnterDistrict = function () {
 if (selectedDistrict === 'almostLove') {
   showAlmostLoveRoom()
 }
+}
+
+window.openSmashTheHate = function () {
+  if (deferUntilVRExit(() => window.openSmashTheHate())) return
+  disposeCurrentWorld()
+  document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })
+  document.querySelector('#district-confirm').classList.add('hidden')
+  document.querySelector('#district-exit').classList.remove('hidden')
+  document.querySelector('#song-modal').classList.add('hidden')
+  document.querySelector('#song-video').pause()
+  const game = createSmashTheHate({ audio: document.querySelector('#song-audio'), back: () => window.returnToPortal() })
+  createWorldLifecycle(game.scene)
+  startWorldAnimation('smashTheHate', game.scene, game.camera, game.update, null, game.xrHooks)
 }
 
 function showInHisMindRoom() {
