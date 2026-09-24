@@ -16,7 +16,7 @@ document.querySelector('#app').innerHTML = `
         <div class="main-buttons">
           <a href="#music" class="btn primary">🎵 Listen Now</a>
           <a href="#vibes" class="btn">✨ Check the Glamniverse Vibes</a>
-          <a href="#neon-city" class="btn">🌆 Enter Neon City Beta</a>
+          <a href="#neon-city" class="btn">🌌 Enter Glamniverse VR</a>
         </div>
       </div>
     </section>
@@ -86,20 +86,20 @@ document.querySelector('#app').innerHTML = `
     </section>
 
     <section id="neon-city" class="section neon-city">
-      <h2>Neon City Beta</h2>
+      <h2>GLAMNIVERSE VR</h2>
 
       <p class="section-text">
-        The interactive Glamniverse world is currently under construction.
-        360 navigation and VR access are coming later.
+        Enter the music. Explore the worlds.
       </p>
 
       <div class="city-box">
-        <h3>🌆 Enter the Glamniverse</h3>
+        <h3>A growing universe of musical worlds and interactive experiences.</h3>
         <p>
-          Future districts: Neon Therapy, In His Mind, Late Night Drives and Almost Love.
+          Explore Neon Therapy, In His Mind, Late Night Drives and Almost Love.
+          Play SMASH THE HATE — smash the hate. Feel the music.
         </p>
         <button onclick="openPortalWorld()">
-          Enter 3D World
+          Explore Glamniverse VR
         </button>
       </div>
     </section>
@@ -161,7 +161,14 @@ document.querySelector('#app').innerHTML = `
       <button class="portal-label label-drive" onclick="enterDistrict('lateNightDrives')">
       🚗 Late Night Drives
       </button>
-      <button class="portal-label" style="left:50%;bottom:5%;top:auto;transform:translateX(-50%)" onclick="openSmashTheHate()">SMASH THE HATE • VR demo</button>
+      <button class="portal-label" style="left:50%;bottom:5%;top:auto;transform:translateX(-50%)" onclick="openSmashTheHate()">SMASH THE HATE</button>
+      <section id="smash-info" class="smash-info hidden" aria-labelledby="smash-info-title">
+        <h2 id="smash-info-title">SMASH THE HATE</h2>
+        <p>Smash the hate. Feel the music.</p>
+        <p>A Glamniverse VR experience powered by I Am Confident.</p>
+        <p id="smash-support-message" role="status"></p>
+        <button onclick="dismissSmashInfo()">Back to worlds</button>
+      </section>
       <div id="district-confirm" class="district-confirm hidden">
       <h2 id="district-confirm-title">Enter In His Mind?</h2>
       <div class="district-confirm-buttons">
@@ -348,6 +355,7 @@ function resumeRuntime() {
 }
 
 function startWorldAnimation(worldId, scene, camera, update, xrMemory = null, xrHooks = null) {
+  document.querySelector('.control-hint').classList.toggle('hidden', worldId === 'smashTheHate')
   activeWorld = { worldId, scene, camera, update, xrMemory, xrHooks }
   resumeRuntime()
   updateVRControl()
@@ -882,6 +890,7 @@ async function enterActiveWorldVR() {
 let activeWorldLifecycle = null
 
 function disposeCurrentWorld() {
+  dismissSmashInfo()
   // Detach the outgoing update before disposing its scene and input.
   activeWorld?.xrHooks?.dispose()
   activeWorld = null
@@ -1117,6 +1126,7 @@ scene.add(stars)
 
 window.closePortalWorld = function () {
   if (deferUntilVRExit(() => window.closePortalWorld())) return
+  dismissSmashInfo()
   stopWorldAnimation()
   activeWorld?.xrHooks?.suspend()
   activeWorldLifecycle?.suspend()
@@ -1190,8 +1200,36 @@ if (selectedDistrict === 'almostLove') {
 }
 }
 
-window.openSmashTheHate = function () {
+// Check capability before creating the game or loading its audio/panorama.
+// Invalidate pending checks on close/world changes so late answers cannot reopen it.
+let smashEntryRequest = 0
+function dismissSmashInfo() {
+  smashEntryRequest++
+  document.querySelector('#smash-info').classList.add('hidden')
+  document.querySelector('.control-hint').classList.toggle('hidden', activeWorld?.worldId === 'smashTheHate')
+}
+window.dismissSmashInfo = dismissSmashInfo
+
+window.openSmashTheHate = async function () {
   if (deferUntilVRExit(() => window.openSmashTheHate())) return
+  // The public route always uses the established portal container/runtime.
+  if (document.querySelector('#portal-world').classList.contains('hidden')) window.openPortalWorld()
+  const attempt = ++smashEntryRequest
+  document.querySelector('#smash-info').classList.remove('hidden')
+  document.querySelector('.control-hint').classList.add('hidden')
+  const message = document.querySelector('#smash-support-message')
+  message.textContent = 'Checking VR support…'
+  let supported = false
+  try {
+    supported = !!(window.isSecureContext && navigator.xr && await navigator.xr.isSessionSupported('immersive-vr'))
+  } catch (error) {
+    console.warn('Unable to check immersive VR support:', error)
+  }
+  if (attempt !== smashEntryRequest) return
+  if (!supported) {
+    message.textContent = 'VR headset required for the full experience. Open Glamniverse in Meta Quest Browser to play.'
+    return
+  }
   disposeCurrentWorld()
   document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })
   document.querySelector('#district-confirm').classList.add('hidden')
@@ -1646,7 +1684,7 @@ particles.forEach((particle) => {
 })
 
 const distanceToCore = camera.position.distanceTo(core.position)
-console.log(distanceToCore)
+
 
 if (distanceToCore < 3) {
   memoryPrompt.style.display = 'block'
@@ -2390,7 +2428,7 @@ for (let i = 0; i < 8; i++) {
 
   rightBuilding.position.set(3.2, height / 2 - 1, -2 - i * 2.2)
   scene.add(rightBuilding)
-  console.log('buildings added')
+
 }
 
   const lineMaterial = new THREE.MeshBasicMaterial({

@@ -453,3 +453,30 @@ h1 {
   backdrop-filter: blur(8px);
   text-shadow: 0 0 12px rgba(255, 0, 255, 0.8);
 }
+/* Compact VR information state; existing worlds remain available behind it. */
+.control-hint.hidden, .smash-info.hidden { display: none; }
+.smash-info {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  text-align: center;
+  background: rgba(8, 0, 20, 0.96);
+  overflow-y: auto;
+}
+.smash-info h2 { color: #ff7bf2; }
+.smash-info p { max-width: 520px; line-height: 1.6; }
+.smash-info button {
+  margin-top: 20px;
+  padding: 14px 24px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff3df2, #7b5cff);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}

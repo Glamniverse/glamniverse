@@ -59,11 +59,11 @@ export function createSmashTheHate({ audio, back }) {
   }
   function readyMenu() {
     if (!xr) {
-      show(['SMASH THE HATE', 'I Am Confident - full-song workout', 'Use ENTER VR to play. No desktop gameplay.'])
+      show(['SMASH THE HATE', 'Powered by I Am Confident', 'Smash the hate. Feel the music. Select ENTER VR.'])
     } else if (phase === 'loading') {
       show(['SMASH THE HATE', audio.error ? 'Audio could not load. Check connection.' : 'Loading I Am Confident…'], audio.error ? 'RETRY LOAD' : null)
     } else {
-      show(['SMASH THE HATE - I AM CONFIDENT', 'Swing gently. Duck under cyan frames.', 'Left: keyboard • Right: mouse (configurable)', healthy ? 'Misses are harmless. 3:02: 110 cards + 5 duck frames.' : 'Track both controllers to begin.'], healthy ? 'START' : null)
+      show(['SMASH THE HATE - I AM CONFIDENT', 'Swing gently. Duck under cyan frames.', 'Left: keyboard • Right: mouse', healthy ? 'Misses are harmless. 3:02: 110 cards + 5 duck frames.' : 'Track both controllers to begin.'], healthy ? 'START' : null)
     }
   }
   function pause(reason) {
