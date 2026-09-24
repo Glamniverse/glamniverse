@@ -2,11 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
 import { CONFIG as C } from '../src/games/smash-the-hate/config.js'
-import { DEMO_LEVEL, validateLevel, spawnAt, missAt, cardZ } from '../src/games/smash-the-hate/level.js'
+import { DEMO_LEVEL, validateLevel, spawnAt, missAt, cardZ, duckSpawnAt, duckEndAt, duckZ, cardSpeed } from '../src/games/smash-the-hate/level.js'
 import { sweptCardHit, isSwing } from '../src/games/smash-the-hate/collision.js'
 import { createTargets } from '../src/games/smash-the-hate/targets.js'
 import { createWeapons } from '../src/games/smash-the-hate/weapons.js'
 import { createSmashTheHate } from '../src/games/smash-the-hate/index.js'
+import { createArena } from '../src/games/smash-the-hate/arena.js'
+import { createDuckJudge, createDucks } from '../src/games/smash-the-hate/ducks.js'
 import { pulseHaptic } from '../src/games/smash-the-hate/effects.js'
 
 // No WebGL, browser or XR hardware: exercise real Three.js transforms/game logic
@@ -64,7 +66,7 @@ function harness() {
 test('demo map has eight events, correct approach and at most two active cards', () => {
   validateLevel(DEMO_LEVEL)
   assert.equal(DEMO_LEVEL.events.length, 8)
-  for (let t = 0; t <= 36; t += 1 / 90) {
+  for (let t = 0; t <= DEMO_LEVEL.duration; t += 1 / 90) {
     assert.ok(DEMO_LEVEL.events.filter(e => spawnAt(e) <= t && missAt(e) > t).length <= 2)
   }
   const e = DEMO_LEVEL.events[0]
@@ -89,11 +91,11 @@ test('pooled cards miss once, consume once, and reset without growing scene', ()
   const root = new THREE.Group(); let misses = 0
   const targets = createTargets(root, DEMO_LEVEL, () => misses++)
   const head = new THREE.Vector3()
-  targets.update(3, head); const target = targets.entries.find(t => t.event)
+  targets.update(4, head); const target = targets.entries.find(t => t.event)
   assert.ok(target); assert.equal(targets.consume(target), true); assert.equal(targets.consume(target), false)
-  for (let t = 3; t <= 36; t += 1 / 72) targets.update(t, head)
+  for (let t = 4; t <= DEMO_LEVEL.duration; t += 1 / 72) targets.update(t, head)
   assert.equal(misses, 7); assert.equal(root.children.length, 2)
-  targets.reset(); targets.update(3, head); assert.equal(targets.entries.filter(t => t.event).length, 1)
+  targets.reset(); targets.update(4, head); assert.equal(targets.entries.filter(t => t.event).length, 1)
   assert.equal(root.children.length, 2)
 })
 
@@ -123,11 +125,11 @@ test('actual weapon pipeline rejects passive overlap, hits once and resets on tr
 test('countdown, whole missed demo, results, replay, back and session cleanup', async () => {
   const h = harness(); assert.equal(h.game.getDebugState().phase, 'ready')
   await h.start(); assert.equal(h.game.getDebugState().phase, 'playing'); assert.equal(h.xr.interaction.rays, false)
-  for (let i = 0; i < 36 * 72 + 2; i++) h.tick()
+  for (let i = 0; i < DEMO_LEVEL.duration * 72 + 2; i++) h.tick()
   const result = h.game.getDebugState()
-  assert.equal(result.phase, 'results'); assert.equal(result.misses, 8); assert.equal(result.hits, 0)
+  assert.equal(result.duckMisses, 3); assert.equal(result.activeObstacle, false); assert.equal(result.phase, 'results'); assert.equal(result.misses, 8); assert.equal(result.hits, 0)
   assert.equal(h.audio.paused, true); assert.equal(h.xr.interaction.rays, true)
-  h.registered[0].action(); assert.equal(h.game.getDebugState().phase, 'countdown'); assert.equal(h.game.getDebugState().misses, 0)
+  h.registered[0].action(); assert.equal(h.game.getDebugState().phase, 'countdown'); assert.equal(h.game.getDebugState().misses, 0); assert.equal(h.game.getDebugState().duckMisses, 0)
   h.registered[1].action(); assert.equal(h.backs(), 1); assert.equal(h.registered.length, 0)
   assert.ok(h.controllers.every(c => c.grip.children.length === 0))
   assert.equal(h.audio.loop, true); assert.equal(h.audio.volume, .43)
@@ -180,4 +182,81 @@ test('buffering and long frame gaps pause; stale playback promise cannot restart
   assert.notEqual(h.game.getDebugState().phase, 'playing')
   assert.equal(h.audio.paused, true); assert.equal(h.registered.length, 0)
   h.game.xrHooks.dispose()
+})
+
+
+test('faster approach retains anticipation and doubles original speed', () => {
+  const e = DEMO_LEVEL.events[0]
+  assert.equal(C.readSeconds, .9)
+  assert.equal(C.travelSeconds, 1.4)
+  assert.equal(cardZ(e, spawnAt(e) + C.readSeconds), -C.spawnDistance)
+  assert.equal(cardSpeed(), 2 * (C.spawnDistance - C.hitDistance) / 2.8)
+})
+
+test('duck baseline freezes for seated/standing and requires whole window clearance', () => {
+  const judge = createDuckJudge()
+  for (const height of [0, 1.2, 1.8]) {
+    judge.calibrate(height)
+    judge.begin(); judge.sample(height - C.duckAmount - .01)
+    assert.equal(judge.success(), true)
+    assert.equal(judge.clearance(), height - C.duckAmount)
+    judge.sample(height)
+    assert.equal(judge.success(), false)
+    judge.begin(); assert.equal(judge.success(), false, 'no observed tracking cannot count as success')
+  }
+})
+
+test('all duck windows exclude cards; invalid overlap rejected', () => {
+  validateLevel(DEMO_LEVEL)
+  assert.equal(DEMO_LEVEL.ducks.length, 3)
+  for (const d of DEMO_LEVEL.ducks) {
+    assert.equal(duckZ(d, duckSpawnAt(d) + C.duckWarningSeconds), -C.duckSpawnDistance)
+    assert.equal(duckZ(d, d.crossAt), 0)
+    for (const c of DEMO_LEVEL.events) assert.ok(missAt(c) <= duckSpawnAt(d) || spawnAt(c) >= duckEndAt(d))
+  }
+  assert.throws(() => validateLevel({ ...DEMO_LEVEL, ducks: [{ ...DEMO_LEVEL.ducks[0], crossAt: 10 }] }), /overlap/)
+})
+
+test('pooled duck success/miss once, replay reset and hide', () => {
+  const root = new THREE.Group(); const outcomes = []
+  const ducks = createDucks(root, DEMO_LEVEL.ducks, success => outcomes.push(success))
+  const head = new THREE.Vector3(0, -.25, 0)
+  ducks.reset(0)
+  for (let t = 0; t < 60; t += 1 / 72) ducks.update(t, head)
+  assert.deepEqual(outcomes, [true, true, true])
+  assert.equal(ducks.stats().activeObstacle, false)
+  ducks.reset(0); head.y = 0
+  for (let t = 0; t < 60; t += 1 / 72) ducks.update(t, head)
+  assert.deepEqual(outcomes, [true, true, true, false, false, false])
+  assert.equal(root.children.length, 1)
+  ducks.reset(); ducks.update(duckSpawnAt(DEMO_LEVEL.ducks[0]), head)
+  ducks.hide(); assert.equal(ducks.stats().activeObstacle, false)
+})
+
+
+test('late panorama load cannot reattach after disposal; environment budget stays bounded', () => {
+  const original = THREE.TextureLoader.prototype.load
+  let complete; const texture = new THREE.Texture(); let disposals = 0
+  texture.addEventListener('dispose', () => disposals++)
+  document.createElementNS = () => ({})
+  THREE.TextureLoader.prototype.load = (url, done) => { complete = done; return texture }
+  try {
+    const scene = new THREE.Scene(); const arena = createArena(scene)
+    arena.update(10, 'playing')
+    let calls = 0; let triangles = 0
+    scene.traverseVisible(o => {
+      if (!o.isMesh) return
+      calls++
+      triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1)
+    })
+    assert.equal(arena.stats().decorativeNotes, 48)
+    assert.ok(calls <= 12); assert.ok(triangles < 12000)
+    console.log(`Arena-only upper estimate: ${calls} draws/eye, ${triangles} triangles/eye; 2 textures with panorama loaded.`)
+    arena.dispose(); complete(texture)
+    assert.ok(disposals >= 1)
+    assert.equal(arena.group.children[0].material.map, null)
+  } finally {
+    THREE.TextureLoader.prototype.load = original
+    delete document.createElementNS
+  }
 })

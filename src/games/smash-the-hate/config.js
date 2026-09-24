@@ -16,7 +16,22 @@ export const CONFIG = {
   laneOffset: 0.36,
   targetBelowEyes: 0.30,
   readSeconds: 0.9,
-  travelSeconds: 2.8,
+  travelSeconds: 1.4,
+  // Panorama is an unlit sphere; yaw is radians relative to round-start front.
+  panoramaYaw: 0,
+  panoramaRadius: 90,
+  noteStreams: 4,
+  notesPerStream: 12, // hard capped to 64 instances total
+  noteSpeed: 0.55,   // lateral metres/second, never toward player
+  portalPulseAmount: 0.08,
+  portalPulseSpeed: 1.5,
+  duckAmount: 0.18, // eye centre must lower 18cm from frozen START pose
+  duckWarningSeconds: 2.5,
+  duckTravelSeconds: 3,
+  duckCrossingSeconds: 0.4, // total window around neutral head plane
+  duckSpawnDistance: 7,
+  duckWidth: 3.6,
+  duckBreaksCombo: true,
   countdownSeconds: 3,
   musicVolume: 0.7,
   sfxVolume: 0.06,
