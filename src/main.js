@@ -1,4 +1,5 @@
 import './style.css'
+import { initializeAnalytics } from './analytics.js'
 import * as THREE from 'three'
 import { createSmashTheHate } from './games/smash-the-hate/index.js'
 
@@ -191,6 +192,9 @@ document.querySelector('#app').innerHTML = `
 
   </main>
 `
+
+// Optional, non-blocking; owner preference is checked before any analytics loads.
+void initializeAnalytics({ production: import.meta.env.PROD })
 
 const songs = {
   neonTherapy: {
