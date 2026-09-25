@@ -1,20 +1,79 @@
 import { CONFIG as C } from './config.js'
 
-// TEMPORARY TEST CHART: arrival times, NOT a final beat/lyric-authored map.
-// Xing: 9112 frames at 48 kHz; 576 delay + 1681 padding samples trimmed.
-// Browser-verified playback duration: 218.640979 s (untrimmed frames: 218.688 s).
-// 129 BPM is a supplied design estimate, not a verified tempo analysis.
+// M2 hardware chart: explicit beat positions, not runtime beat detection.
+// Local FFT spectral-flux analysis: 125.28 BPM in both 8–32 and 32–56 s.
+// The full-song estimate is ~125.3 BPM; offset includes analysis uncertainty.
+export const GRID = { bpm: 125.28, offset: 0.005 }
+export const beatTime = beat => GRID.offset + beat * 60 / GRID.bpm
+// Normal / centre / high / side lanes; NO low lanes or simultaneous pairs.
 const rows = [
-  [6,'L'],[7.4,'R'],[8.8,'L'],[10.2,'R'],[11.6,'LC'],[13,'RC'],
-  [14.4,'LH'],[15.8,'RH'],[17.2,'LL'],[18.6,'RL'],[20,'L','R'],
-  [29,'L'],[30.1,'L'],[31.2,'R'],[32.3,'R'],[33.4,'LH','RH'],
-  [43,'LC'],[44.1,'RC'],[45.2,'LL'],[46.3,'RL'],[47.4,'L','R'],
+  [12,'L'],
+  [14,'R'],
+  [16,'L'],
+  [18,'R'],
+  [20,'L'],
+  [21,'R'],
+  [22,'L'],
+  [23,'R'],
+  [24,'LS'],
+  [26,'RS'],
+  [28,'L'],
+  [29,'L'],
+  [30,'R'],
+  [31,'R'],
+  [32,'LH'],
+  [33,'RH'],
+  [34,'L'],
+  [35,'R'],
+  [36,'LS'],
+  [38,'RS'],
+  [40,'L'],
+  [41,'R'],
+  [42,'L'],
+  [43,'R'],
+  [44,'LH'],
+  [57,'L'],
+  [58,'R'],
+  [59,'LS'],
+  [60,'RS'],
+  [61,'L'],
+  [62,'L'],
+  [63,'R'],
+  [64,'R'],
+  [66,'LH'],
+  [67,'RH'],
+  [68,'L'],
+  [69,'R'],
+  [70,'LS'],
+  [71,'RS'],
+  [72,'L'],
+  [85,'L'],
+  [86,'R'],
+  [87,'LS'],
+  [88,'RS'],
+  [91,'L'],
+  [92,'R'],
+  [93,'LH'],
+  [94,'RH'],
+  [95,'L'],
+  [96,'L'],
+  [97,'R'],
+  [98,'R'],
+  [99,'LS'],
+  [100,'RS'],
+  [100.5,'L'],
+  [101,'R'],
+  [101.5,'L'],
+  [102,'R'],
 ]
 export const LEVEL = {
   audio: '/audio/all-eyes-on-me/all-eyes-on-me.mp3', duration: 56, masterDuration: 218.640979,
-  events: rows.flatMap(([hitAt,...lanes]) => lanes.map(lane => ({hitAt,lane,hand:lane.startsWith('L')?'left':'right'}))),
-  obstacles: [{at:24.6,kind:'duck'}, {at:38,kind:'left'}, {at:52,kind:'right'}],
+  events: rows.map(([beat,lane]) => ({beat,hitAt:beatTime(beat),lane,hand:lane.startsWith('L')?'left':'right'})),
+  obstacles: [{at:beatTime(51),kind:'duck'}, {at:beatTime(79),kind:'left'}, {at:beatTime(109),kind:'right'}],
 }
+export const isSideTarget = e => e.lane === 'LS' || e.lane === 'RS'
+// A side eye fans out from the portal on a straight line; it never follows gaze.
+export const targetX = (e,t) => C.lanes[e.lane][0] * (isSideTarget(e) ? (t-spawnAt(e))/C.travelSeconds : 1)
 export const arrivalAt = e => e.hitAt + C.chartOffsetSeconds
 export const spawnAt = e => arrivalAt(e) - C.travelSeconds
 export const speed = () => (C.spawnDistance - C.hitDistance) / C.travelSeconds
@@ -27,7 +86,7 @@ export const obstacleEnd = e => obstacleAt(e) + C.obstacleClearSeconds
 export function validateLevel(level = LEVEL) {
   let last = -Infinity
   for (const e of level.events) {
-    if (!Number.isFinite(e.hitAt) || e.hitAt < last || !C.lanes[e.lane] || !['left','right'].includes(e.hand) || (e.lane.startsWith('L') ? 'left' : 'right') !== e.hand) throw Error('Invalid eye event')
+    if (!Number.isFinite(e.hitAt) || e.hitAt - last < C.minTargetGap || !C.lanes[e.lane] || !['left','right'].includes(e.hand) || (e.lane.startsWith('L') ? 'left' : 'right') !== e.hand) throw Error('Invalid eye event')
     if (spawnAt(e) < 0 || missAt(e) > level.duration) throw Error('Eye outside demo')
     last = e.hitAt
   }

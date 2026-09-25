@@ -1249,11 +1249,12 @@ window.openSmashTheHate = async function () {
 if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
   import('./games/all-eyes-on-me/index.js').then(({ createAllEyesOnMe }) => {
     const entry = document.createElement('button')
-    entry.className = 'portal-label'
-    entry.style.cssText = 'left:50%;bottom:13%;top:auto;transform:translateX(-50%)'
+    entry.id = 'all-eyes-test-entry'
+    entry.style.cssText = 'display:block;margin:16px auto 0;max-width:100%;white-space:normal;overflow-wrap:anywhere'
     entry.textContent = 'ALL EYES ON ME — VR FITNESS TEST'
     function openEyes() {
       if (deferUntilVRExit(openEyes)) return
+      if (document.querySelector('#portal-world').classList.contains('hidden')) window.openPortalWorld()
       disposeCurrentWorld()
       document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })
       document.querySelector('#district-confirm').classList.add('hidden')
@@ -1265,8 +1266,8 @@ if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
       startWorldAnimation('allEyesOnMe', game.scene, game.camera, game.update, null, game.xrHooks)
     }
     entry.onclick = openEyes
-    if (activeWorld && activeWorld.worldId !== 'portal') entry.style.display = 'none'
-    document.querySelector('#portal-world').appendChild(entry)
+    // Normal document flow: no overlay on any district or music control.
+    document.querySelector('#neon-city .city-box').appendChild(entry)
   }).catch(error => console.warn('All Eyes On Me test entry unavailable:', error))
 }
 

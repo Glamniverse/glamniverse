@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
 import { CONFIG as C } from '../src/games/all-eyes-on-me/config.js'
-import { LEVEL, validateLevel, spawnAt, missAt, targetZ, strikeAt, obstacleSpawn, obstacleEnd } from '../src/games/all-eyes-on-me/level.js'
+import { LEVEL, validateLevel, spawnAt, missAt, targetZ, strikeAt, obstacleSpawn, obstacleEnd, GRID, beatTime, isSideTarget, targetX } from '../src/games/all-eyes-on-me/level.js'
 import { createTargets } from '../src/games/all-eyes-on-me/targets.js'
 import { createHands } from '../src/games/all-eyes-on-me/hands.js'
 import { createObstacleJudge, createObstacles } from '../src/games/all-eyes-on-me/obstacles.js'
+import { createArena } from '../src/games/all-eyes-on-me/arena.js'
+import { synthesizePaddedImpact, createGameAudio } from '../src/games/all-eyes-on-me/audio.js'
 import { createAllEyesOnMe } from '../src/games/all-eyes-on-me/index.js'
 const ctx = { fillRect() {}, strokeRect() {}, fillText() {} }
 globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) }
@@ -67,7 +69,7 @@ function harness() {
 
 
 test('56-second chart has continuous targets, valid hands, caps and isolated obstacles',()=>{
-  assert.equal(validateLevel(),true);assert.equal(LEVEL.events.length,24)
+  assert.equal(validateLevel(),true);assert.equal(LEVEL.events.length,58)
   assert.equal(LEVEL.obstacles.length,3);assert.ok(LEVEL.duration<LEVEL.masterDuration)
   for(const e of LEVEL.events){
     assert.ok(Math.abs(targetZ(e,spawnAt(e))+C.spawnDistance)<1e-8)
@@ -88,7 +90,7 @@ test('eye pool consumes once, counts every missed eye once, and replays without 
   t.update(spawnAt(LEVEL.events[0]),head);const eye=t.entries.find(e=>e.event)
   assert.ok(eye);assert.equal(t.consume(eye),true);assert.equal(t.consume(eye),false)
   for(let x=0;x<56;x+=1/72)t.update(x,head)
-  assert.equal(misses,23);assert.equal(root.children.length,C.maxTargets)
+  assert.equal(misses,57);assert.equal(root.children.length,C.maxTargets)
   t.reset();t.update(spawnAt(LEVEL.events[0]),head);assert.equal(t.entries.filter(e=>e.event).length,1)
   t.dispose()
 })
@@ -130,7 +132,7 @@ test('countdown, audio clock, full demo results, replay, exit and disposal',asyn
   const h=harness();assert.equal(h.game.xrHooks.stationary,true);assert.equal(h.registered.length,2)
   await h.start();assert.equal(h.game.getDebugState().phase,'playing');assert.equal(h.xr.interaction.rays,false)
   for(let i=0;i<56*72+2;i++)h.tick()
-  assert.equal(h.game.getDebugState().phase,'results');assert.equal(h.game.getDebugState().misses,24)
+  assert.equal(h.game.getDebugState().phase,'results');assert.equal(h.game.getDebugState().misses,58)
   assert.equal(h.game.getDebugState().result.completed,true);assert.equal(h.audio.paused,true)
   h.registered[0].action();assert.equal(h.game.getDebugState().phase,'countdown');assert.equal(h.game.getDebugState().misses,0)
   h.game.xrHooks.onRequestExit();h.game.xrHooks.onExit();assert.equal(h.audio.paused,true);assert.equal(h.registered.length,0)
@@ -168,7 +170,7 @@ test('conservative geometry budget remains bounded',()=>{
     for(const m of Array.isArray(o.material)?o.material:[o.material])if(m.map)textures.add(m.map)
   })
   console.log('All Eyes On Me all-pools+menus upper bound (excludes shared rays):', {calls,triangles,textures:textures.size})
-  assert.ok(calls<=40);assert.ok(triangles<15000);assert.ok(textures.size<=6)
+  assert.ok(calls<=44);assert.ok(triangles<15000);assert.ok(textures.size<=7)
   h.game.xrHooks.dispose()
 })
 
@@ -182,8 +184,8 @@ test('real audio metadata matches verified gapless duration',()=>{
 })
 test('real game sweep awards one correct-hand punch and combo only once',async()=>{
   const h=harness();await h.start()
-  while(h.audio.currentTime<5.9)h.tick()
-  h.controllers[0].grip.position.set(-.34,-.3,-.3)
+  while(h.audio.currentTime<LEVEL.events[0].hitAt-0.1)h.tick()
+  h.controllers[0].grip.position.set(-.34,-.20,-.3)
   h.tick();h.tick()
   h.controllers[0].grip.position.z=-.85;h.tick(.08)
   const score=h.game.getDebugState()
@@ -201,4 +203,65 @@ test('actual main entry and XR eligibility gates allow DEV/Preview but exclude P
   assert.equal(evaluate({DEV:false,VITE_VERCEL_ENV:'preview'}),true)
   assert.equal(evaluate({DEV:false,VITE_VERCEL_ENV:'production'}),false)
   assert.equal(evaluate({DEV:false}),false)
+})
+
+test('M2 uses measured beat grid, no simultaneous pairs or downward lanes',()=>{
+  assert.equal(GRID.bpm,125.28)
+  for(let i=0;i<LEVEL.events.length;i++){
+    const e=LEVEL.events[i]
+    assert.equal(e.hitAt,beatTime(e.beat));assert.ok(C.lanes[e.lane][1]>=-0.2)
+    if(i)assert.ok(e.hitAt-LEVEL.events[i-1].hitAt>=C.minTargetGap)
+  }
+  assert.throws(()=>validateLevel({...LEVEL,events:[LEVEL.events[0],{...LEVEL.events[0],lane:'R',hand:'right'}]}))
+  assert.throws(()=>validateLevel({...LEVEL,events:[{hitAt:6,lane:'LL',hand:'left'}]}))
+  assert.equal(C.travelSeconds,1.55);assert.equal(C.obstacleTravelSeconds,2.6)
+})
+test('side eyes follow a fixed front-left/right line with pooled matching chevrons',()=>{
+  const root=new THREE.Group(),e=LEVEL.events.find(e=>e.lane==='LS'),r=LEVEL.events.find(e=>e.lane==='RS')
+  assert.equal(isSideTarget(e),true);assert.ok(Math.abs(targetX(e,spawnAt(e)))<1e-9)
+  assert.ok(Math.abs(targetX(e,e.hitAt)+.55)<1e-9);assert.ok(Math.abs(targetX(r,r.hitAt)-.55)<1e-9)
+  assert.ok(Math.abs(Math.atan2(targetX(e,e.hitAt),C.hitDistance))<=Math.PI/4+1e-9)
+  const targets=createTargets(root,{events:[e]},()=>{})
+  targets.update(spawnAt(e),new THREE.Vector3());const eye=targets.entries.find(t=>t.event)
+  assert.equal(eye.cue.visible,true);assert.equal(eye.cue.scale.x,-1)
+  const time=e.hitAt-.2;targets.update(time,new THREE.Vector3(1,0,0))
+  assert.ok(Math.abs(eye.position.x-targetX(e,time))<1e-9)
+  targets.reset();assert.equal(targets.entries.filter(t=>t.mesh.visible).length,0);targets.dispose()
+})
+test('approved panorama is 2:1; late load is discarded after world disposal',()=>{
+  const bytes=readFileSync(new URL('../public/images/all-eyes-on-me/arena-360.png',import.meta.url))
+  assert.equal(bytes.readUInt32BE(16),2*bytes.readUInt32BE(20))
+  const old=THREE.TextureLoader.prototype.load;let loaded;const texture=new THREE.Texture();let disposed=0
+  texture.addEventListener('dispose',()=>disposed++)
+  document.createElementNS=()=>({})
+  THREE.TextureLoader.prototype.load=function(url,onLoad){assert.equal(url,'/images/all-eyes-on-me/arena-360.png');loaded=onLoad;return texture}
+  try{
+    const scene=new THREE.Scene(),arena=createArena(scene);assert.equal(arena.stats().panoramaStatus,'loading')
+    arena.dispose();loaded(texture);assert.ok(disposed>0)
+    assert.equal(scene.children[0].children.filter(o=>o.material?.map===texture).length,0)
+    const ready=createArena(new THREE.Scene());loaded(texture);assert.equal(ready.stats().panoramaStatus,'ready')
+    assert.equal(texture.generateMipmaps,false);ready.dispose()
+  }finally{THREE.TextureLoader.prototype.load=old;delete document.createElementNS}
+})
+test('padded impact is deterministic, bounded and short with a soft tail',()=>{
+  const a=synthesizePaddedImpact(48000),b=synthesizePaddedImpact(48000)
+  assert.deepEqual(a,b);assert.equal(a.length,8640)
+  let peak=0;for(const v of a){assert.ok(Number.isFinite(v));peak=Math.max(peak,Math.abs(v))}
+  assert.ok(peak<=.851);assert.ok(Math.abs(a[0])<1e-9);assert.ok(Math.abs(a.at(-1))<.001)
+})
+test('impact nodes are capped and stopped on release without changing music gain',()=>{
+  const created=[];class Context {
+    sampleRate=48000;state='running';destination={}
+    createBuffer(channels,length){const data=new Float32Array(length);return{getChannelData:()=>data}}
+    createBufferSource(){const voice={connect(){},disconnect(){},start(){},stop(){this.stopped=true;this.onended?.()}};created.push(voice);return voice}
+    createGain(){return{gain:{value:0},connect(){},disconnect(){}}}
+    resume(){return Promise.resolve()}close(){return Promise.resolve()}
+  }
+  window.AudioContext=Context
+  try{
+    const a=new FakeAudio(),music=createGameAudio(a,LEVEL.audio);music.unlockEffects()
+    for(let i=0;i<10;i++)music.impact()
+    assert.equal(created.length,C.maxImpactVoices);assert.equal(a.volume,C.musicVolume)
+    music.release();assert.ok(created.every(v=>v.stopped));assert.equal(a.volume,.43);music.dispose()
+  }finally{delete window.AudioContext}
 })
