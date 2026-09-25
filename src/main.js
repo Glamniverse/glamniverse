@@ -359,7 +359,7 @@ function resumeRuntime() {
 }
 
 function startWorldAnimation(worldId, scene, camera, update, xrMemory = null, xrHooks = null) {
-  document.querySelector('.control-hint').classList.toggle('hidden', worldId === 'smashTheHate')
+  document.querySelector('.control-hint').classList.toggle('hidden', (worldId === 'smashTheHate' || worldId === 'allEyesOnMe'))
   activeWorld = { worldId, scene, camera, update, xrMemory, xrHooks }
   resumeRuntime()
   updateVRControl()
@@ -378,7 +378,7 @@ function disposeRuntimeRenderer() {
 
 // Stationary XR uses the shared runtime; the portal remains browser-only.
 const stationaryVRWorlds = new Set([
-  'inHisMind', 'neonTherapy', 'lateNightDrives', 'almostLove', 'smashTheHate'
+  'inHisMind', 'neonTherapy', 'lateNightDrives', 'almostLove', 'smashTheHate', ...((import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') ? ['allEyesOnMe'] : [])
 ])
 let vrSupported = false
 let vrButton = null
@@ -1243,6 +1243,31 @@ window.openSmashTheHate = async function () {
   const game = createSmashTheHate({ audio: document.querySelector('#song-audio'), back: () => window.returnToPortal() })
   createWorldLifecycle(game.scene)
   startWorldAnimation('smashTheHate', game.scene, game.camera, game.update, null, game.xrHooks)
+}
+
+// Test entry only: Vercel supplies this environment value; Production stays excluded.
+if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
+  import('./games/all-eyes-on-me/index.js').then(({ createAllEyesOnMe }) => {
+    const entry = document.createElement('button')
+    entry.className = 'portal-label'
+    entry.style.cssText = 'left:50%;bottom:13%;top:auto;transform:translateX(-50%)'
+    entry.textContent = 'ALL EYES ON ME — VR FITNESS TEST'
+    function openEyes() {
+      if (deferUntilVRExit(openEyes)) return
+      disposeCurrentWorld()
+      document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })
+      document.querySelector('#district-confirm').classList.add('hidden')
+      document.querySelector('#district-exit').classList.remove('hidden')
+      document.querySelector('#song-modal').classList.add('hidden')
+      document.querySelector('#song-video').pause()
+      const game = createAllEyesOnMe({ audio: document.querySelector('#song-audio'), back: () => window.returnToPortal() })
+      createWorldLifecycle(game.scene)
+      startWorldAnimation('allEyesOnMe', game.scene, game.camera, game.update, null, game.xrHooks)
+    }
+    entry.onclick = openEyes
+    if (activeWorld && activeWorld.worldId !== 'portal') entry.style.display = 'none'
+    document.querySelector('#portal-world').appendChild(entry)
+  }).catch(error => console.warn('All Eyes On Me test entry unavailable:', error))
 }
 
 function showInHisMindRoom() {
