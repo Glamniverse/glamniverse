@@ -1,85 +1,28 @@
 import { CONFIG as C } from './config.js'
 
-// M2 hardware chart: explicit beat positions, not runtime beat detection.
-// Local FFT spectral-flux analysis: 125.28 BPM in both 8–32 and 32–56 s.
-// The full-song estimate is ~125.3 BPM; offset includes analysis uncertainty.
-export const GRID = { bpm: 125.28, offset: 0.005 }
-export const beatTime = beat => GRID.offset + beat * 60 / GRID.bpm
-// Normal / centre / high / side lanes; NO low lanes or simultaneous pairs.
-const rows = [
-  [12,'L'],
-  [14,'R'],
-  [16,'L'],
-  [18,'R'],
-  [20,'L'],
-  [21,'R'],
-  [22,'L'],
-  [23,'R'],
-  [24,'LS'],
-  [26,'RS'],
-  [28,'L'],
-  [29,'L'],
-  [30,'R'],
-  [31,'R'],
-  [32,'LH'],
-  [33,'RH'],
-  [34,'L'],
-  [35,'R'],
-  [36,'LS'],
-  [38,'RS'],
-  [40,'L'],
-  [41,'R'],
-  [42,'L'],
-  [43,'R'],
-  [44,'LH'],
-  [57,'L'],
-  [58,'R'],
-  [59,'LS'],
-  [60,'RS'],
-  [61,'L'],
-  [62,'L'],
-  [63,'R'],
-  [64,'R'],
-  [66,'LH'],
-  [67,'RH'],
-  [68,'L'],
-  [69,'R'],
-  [70,'LS'],
-  [71,'RS'],
-  [72,'L'],
-  [85,'L'],
-  [86,'R'],
-  [87,'LS'],
-  [88,'RS'],
-  [91,'L'],
-  [92,'R'],
-  [93,'LH'],
-  [94,'RH'],
-  [95,'L'],
-  [96,'L'],
-  [97,'R'],
-  [98,'R'],
-  [99,'LS'],
-  [100,'RS'],
-  [100.5,'L'],
-  [101,'R'],
-  [101.5,'L'],
-  [102,'R'],
-]
+import { EVENTS, OBSTACLES, WAVES } from './chart.js'
+export { GRID, beatTime, SECTIONS } from './chart.js'
 export const LEVEL = {
-  audio: '/audio/all-eyes-on-me/all-eyes-on-me.mp3', duration: 56, masterDuration: 218.640979,
-  events: rows.map(([beat,lane]) => ({beat,hitAt:beatTime(beat),lane,hand:lane.startsWith('L')?'left':'right'})),
-  obstacles: [{at:beatTime(51),kind:'duck'}, {at:beatTime(79),kind:'left'}, {at:beatTime(109),kind:'right'}],
+  audio: '/audio/all-eyes-on-me/all-eyes-on-me.mp3', duration: 218.640979, masterDuration: 218.640979,
+  events: EVENTS, obstacles: OBSTACLES, waves: WAVES,
 }
 export const isSideTarget = e => e.lane === 'LS' || e.lane === 'RS'
 // A side eye fans out from the portal on a straight line; it never follows gaze.
-export const targetX = (e,t) => C.lanes[e.lane][0] * (isSideTarget(e) ? (t-spawnAt(e))/C.travelSeconds : 1)
+const nearX = (e,t) => C.lanes[e.lane][0] * (isSideTarget(e) ? (t-nearSpawnAt(e))/C.travelSeconds : 1)
+// Distant presentation blends into the EXACT M2 near trajectory and velocity.
+function distant(t,e,start,end,velocity) {
+  const u=Math.max(0,Math.min(1,(t-spawnAt(e))/C.distantLeadSeconds)),u2=u*u,u3=u2*u
+  return (2*u3-3*u2+1)*start+(-2*u3+3*u2)*end+(u3-u2)*C.distantLeadSeconds*velocity
+}
+export const targetX = (e,t) => t<nearSpawnAt(e) ? distant(t,e,C.portalX,nearX(e,nearSpawnAt(e)),isSideTarget(e)?C.lanes[e.lane][0]/C.travelSeconds:0) : nearX(e,t)
+export const targetY = (e,t) => t<nearSpawnAt(e) ? distant(t,e,C.portalY,C.lanes[e.lane][1],0) : C.lanes[e.lane][1]
 export const arrivalAt = e => e.hitAt + C.chartOffsetSeconds
-export const spawnAt = e => arrivalAt(e) - C.travelSeconds
+export const nearSpawnAt = e => arrivalAt(e) - C.travelSeconds
+export const spawnAt = e => nearSpawnAt(e) - C.distantLeadSeconds
 export const speed = () => (C.spawnDistance - C.hitDistance) / C.travelSeconds
 export const missAt = e => arrivalAt(e) + (C.hitDistance + C.missBehind) / speed()
 export const strikeAt = e => arrivalAt(e) - (C.strikeAreaDistance - C.hitDistance) / speed()
-export const targetZ = (e,t) => -C.hitDistance + (t - arrivalAt(e)) * speed()
+export const targetZ = (e,t) => t<nearSpawnAt(e) ? distant(t,e,-C.portalDistance,-C.spawnDistance,speed()) : -C.hitDistance + (t - arrivalAt(e)) * speed()
 export const obstacleAt = e => e.at + C.chartOffsetSeconds
 export const obstacleSpawn = e => obstacleAt(e) - C.obstacleTravelSeconds
 export const obstacleEnd = e => obstacleAt(e) + C.obstacleClearSeconds
@@ -102,6 +45,12 @@ export function validateLevel(level = LEVEL) {
       const t=start(e)
       if (level.events.filter(v=>start(v)<=t && missAt(v)>t).length>cap) throw Error('Eye pool/strike cap exceeded')
     }
+  }
+  for(let i=0;i<level.waves.length;i++) {
+    const at=level.waves[i].at+C.chartOffsetSeconds
+    if(!Number.isFinite(at)||at<0||at+C.waveDuration>level.duration)throw Error('Wave outside audio')
+    if(i && at<level.waves[i-1].at+C.chartOffsetSeconds)throw Error('Wave ordering')
+    if(level.waves.filter(w=>w.at+C.chartOffsetSeconds<=at && w.at+C.chartOffsetSeconds+C.waveDuration>at).length>C.maxWaves)throw Error('Wave pool exceeded')
   }
   return true
 }

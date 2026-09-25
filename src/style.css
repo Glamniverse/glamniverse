@@ -201,7 +201,8 @@ h1 {
   font-size: 32px;
 }
 
-.city-box button {
+.city-box button,
+.vr-experience-card button {
   margin-top: 20px;
   padding: 14px 22px;
   border-radius: 999px;
@@ -480,3 +481,11 @@ h1 {
   font-weight: bold;
   cursor: pointer;
 }
+
+/* Separate games from the unchanged four-world Portal; normal flow at every width. */
+.vr-experiences { max-width: 1000px; margin: 42px auto 0; }
+.vr-experience-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; margin-top: 24px; }
+.vr-experience-card { padding: 28px 20px; border: 1px solid #8642a7; border-radius: 20px; background: #150e26; }
+.vr-experience-card h4 { margin: 0 0 12px; font-size: 1.1rem; }
+.vr-experience-card p { line-height: 1.6; }
+.vr-experience-card button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }

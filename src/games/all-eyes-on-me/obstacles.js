@@ -24,8 +24,8 @@ export function createObstacles(root,events,onResult){
   const material=new THREE.MeshBasicMaterial({color:0xb681ff})
   const bar=new THREE.BoxGeometry(1,1,0.025)
   const bars=Array.from({length:4},()=>{const m=new THREE.Mesh(bar,material);group.add(m);return m})
-  const label=makePanel(1.65,0.25,1024,128);group.add(label.mesh)
-  const icon=new THREE.Group();icon.position.y=0.28;group.add(icon)
+  const label=makePanel(2.6,0.42,512,128);group.add(label.mesh)
+  const icon=new THREE.Group();icon.position.y=-0.02;group.add(icon)
   const eye=new THREE.Mesh(eyeGeometry(),material);eye.scale.setScalar(0.5);icon.add(eye)
   const slash=new THREE.Mesh(bar,material);slash.scale.set(0.025,0.4,1);slash.rotation.z=-0.7;icon.add(slash)
   const judge=createObstacleJudge();let next=0,active=null,judged=false
@@ -41,8 +41,8 @@ export function createObstacles(root,events,onResult){
     bars[1].position.set((left+right)/2,top,0);bars[1].scale.set(right-left,0.02,1)
     bars[2].position.set(left,(bottom+top)/2,0);bars[2].scale.set(0.02,top-bottom,1)
     bars[3].position.set(right,(bottom+top)/2,0);bars[3].scale.set(0.02,top-bottom,1)
-    label.mesh.position.set(0,0.72,0)
-    label.draw([kind==='duck'?'DUCK':kind==='left'?'< <  LEAN LEFT':'LEAN RIGHT  > >'],'#ba8aff')
+    label.mesh.position.set(0,0.38,0)
+    label.draw([kind==='duck'?'↓ DUCK ↓':kind==='left'?'← LEAN LEFT':'LEAN RIGHT →'],'#ba8aff')
   }
   return {
     reset(){next=0;hide();judge.calibrate({x:0,y:0});judged=false},hide,

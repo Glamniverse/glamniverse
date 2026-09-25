@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { CONFIG as C } from './config.js'
-import { spawnAt, missAt, targetZ, targetX, isSideTarget } from './level.js'
+import { spawnAt, missAt, targetZ, targetX, targetY, isSideTarget } from './level.js'
 
 // One shared stylized eye outline + iris geometry; opaque, no anatomical eyeballs.
 export function eyeGeometry() {
@@ -36,7 +36,7 @@ export function createTargets(root,level,onMiss) {
     update(time,head){
       for(const t of entries){
         if(!t.event)continue
-        t.previous.copy(t.position);t.position.z=targetZ(t.event,time);t.position.x=targetX(t.event,time)
+        t.previous.copy(t.position);t.position.z=targetZ(t.event,time);t.position.x=targetX(t.event,time);t.position.y=targetY(t.event,time)
         t.mesh.rotation.y=Math.atan2(head.x-t.position.x,head.z-t.position.z)
         if(time>=missAt(t.event)){t.event=null;t.mesh.visible=false;onMiss()}
       }
@@ -46,7 +46,7 @@ export function createTargets(root,level,onMiss) {
         const t=entries.find(v=>!v.event)
         if(!t)throw Error('Validated eye pool exhausted')
         t.event=event;t.mesh.visible=true;t.mesh.rotation.y=0
-        const [,y]=C.lanes[event.lane];t.position.set(targetX(event,time),y,targetZ(event,time));t.previous.copy(t.position)
+        t.position.set(targetX(event,time),targetY(event,time),targetZ(event,time));t.previous.copy(t.position)
         t.eye.material=t.centre.material=t.cue.material=materials[event.hand]
         const sign=event.hand==='left'?-1:1
         t.cue.visible=isSideTarget(event);t.cue.position.x=sign*0.28;t.cue.scale.x=sign

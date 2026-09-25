@@ -12,7 +12,10 @@ export const CONFIG = {
     LH: [-0.34, -0.1], RH: [0.34, -0.1],
     LS: [-0.55, -0.20], RS: [0.55, -0.20],
   },
-  punchPoints: 100, platformDiameter: 4.2, portalDistance: 9,
+  punchPoints: 100, platformDiameter: 4.2, portalDistance: 22,
+  // Image eye centre approximately (901,400) in the unchanged 1774x887 artwork.
+  portalX: -1.1, portalY: 3.4, distantLeadSeconds: 0.65,
+  waveDuration: 6, maxWaves: 2, waveClearance: 2.2, waveRadius: 5,
   panoramaRadius: 90, panoramaYaw: Math.PI / 2, // centre of artwork faces forward
   minTargetGap: 0.23, // never simultaneous; half-beat bursts remain readable,
   duckAmount: 0.16, dodgeAmount: 0.16,

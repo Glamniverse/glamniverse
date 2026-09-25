@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
 import { CONFIG as C } from '../src/games/all-eyes-on-me/config.js'
-import { LEVEL, validateLevel, spawnAt, missAt, targetZ, strikeAt, obstacleSpawn, obstacleEnd, GRID, beatTime, isSideTarget, targetX } from '../src/games/all-eyes-on-me/level.js'
+import { LEVEL, validateLevel, spawnAt, missAt, targetZ, strikeAt, obstacleSpawn, obstacleEnd, GRID, beatTime, isSideTarget, targetX, targetY, nearSpawnAt, speed, SECTIONS } from '../src/games/all-eyes-on-me/level.js'
 import { createTargets } from '../src/games/all-eyes-on-me/targets.js'
 import { createHands } from '../src/games/all-eyes-on-me/hands.js'
 import { createObstacleJudge, createObstacles } from '../src/games/all-eyes-on-me/obstacles.js'
+import { createWaves } from '../src/games/all-eyes-on-me/waves.js'
 import { createArena } from '../src/games/all-eyes-on-me/arena.js'
 import { synthesizePaddedImpact, createGameAudio } from '../src/games/all-eyes-on-me/audio.js'
 import { createAllEyesOnMe } from '../src/games/all-eyes-on-me/index.js'
@@ -68,11 +69,11 @@ function harness() {
 }
 
 
-test('56-second chart has continuous targets, valid hands, caps and isolated obstacles',()=>{
-  assert.equal(validateLevel(),true);assert.equal(LEVEL.events.length,58)
-  assert.equal(LEVEL.obstacles.length,3);assert.ok(LEVEL.duration<LEVEL.masterDuration)
+test('Full-song chart has continuous targets, valid hands, caps and isolated obstacles',()=>{
+  assert.equal(validateLevel(),true);assert.equal(LEVEL.events.length,235)
+  assert.equal(LEVEL.obstacles.length,11);assert.equal(LEVEL.duration,LEVEL.masterDuration)
   for(const e of LEVEL.events){
-    assert.ok(Math.abs(targetZ(e,spawnAt(e))+C.spawnDistance)<1e-8)
+    assert.ok(Math.abs(targetZ(e,spawnAt(e))+C.portalDistance)<1e-8)
     assert.ok(targetZ(e,spawnAt(e)+0.1)>targetZ(e,spawnAt(e)))
     assert.ok(Math.abs(targetZ(e,e.hitAt)+C.hitDistance)<1e-8)
     assert.ok(missAt(e)<LEVEL.duration)
@@ -89,8 +90,8 @@ test('eye pool consumes once, counts every missed eye once, and replays without 
   const root=new THREE.Group();let misses=0;const t=createTargets(root,LEVEL,()=>misses++),head=new THREE.Vector3()
   t.update(spawnAt(LEVEL.events[0]),head);const eye=t.entries.find(e=>e.event)
   assert.ok(eye);assert.equal(t.consume(eye),true);assert.equal(t.consume(eye),false)
-  for(let x=0;x<56;x+=1/72)t.update(x,head)
-  assert.equal(misses,57);assert.equal(root.children.length,C.maxTargets)
+  for(let x=0;x<LEVEL.duration;x+=1/72)t.update(x,head)
+  assert.equal(misses,234);assert.equal(root.children.length,C.maxTargets)
   t.reset();t.update(spawnAt(LEVEL.events[0]),head);assert.equal(t.entries.filter(e=>e.event).length,1)
   t.dispose()
 })
@@ -122,17 +123,17 @@ test('duck/left/right judges use frozen neutral height and small signed lean',()
 test('pooled obstacle windows and reset judge once without camera changes',()=>{
   const root=new THREE.Group(),results=[],o=createObstacles(root,LEVEL.obstacles,s=>results.push(s)),head=new THREE.Vector3()
   o.reset()
-  for(let t=0;t<56;t+=1/72){head.set(t<40?-0.2:0.2,-.2,0);o.update(t,head)}
-  assert.deepEqual(results,[true,true,true]);assert.equal(root.children.length,1)
+  for(let t=0;t<LEVEL.duration;t+=1/72){const active=LEVEL.obstacles.find(v=>t>=obstacleSpawn(v)&&t<=obstacleEnd(v));head.set(active?.kind==='left'?-.2:.2,-.2,0);o.update(t,head)}
+  assert.deepEqual(results,LEVEL.obstacles.map(()=>true));assert.equal(root.children.length,1)
   o.reset();assert.equal(o.stats().activeObstacle,null)
-  for(let t=0;t<56;t+=1/72)o.update(t,new THREE.Vector3())
-  assert.deepEqual(results.slice(3),[false,false,false])
+  for(let t=0;t<LEVEL.duration;t+=1/72)o.update(t,new THREE.Vector3())
+  assert.deepEqual(results.slice(LEVEL.obstacles.length),LEVEL.obstacles.map(()=>false))
 })
 test('countdown, audio clock, full demo results, replay, exit and disposal',async()=>{
   const h=harness();assert.equal(h.game.xrHooks.stationary,true);assert.equal(h.registered.length,2)
   await h.start();assert.equal(h.game.getDebugState().phase,'playing');assert.equal(h.xr.interaction.rays,false)
-  for(let i=0;i<56*72+2;i++)h.tick()
-  assert.equal(h.game.getDebugState().phase,'results');assert.equal(h.game.getDebugState().misses,58)
+  for(let i=0;i<Math.ceil(h.audio.duration*72)+2;i++)h.tick()
+  assert.equal(h.game.getDebugState().phase,'results');assert.equal(h.game.getDebugState().misses,235)
   assert.equal(h.game.getDebugState().result.completed,true);assert.equal(h.audio.paused,true)
   h.registered[0].action();assert.equal(h.game.getDebugState().phase,'countdown');assert.equal(h.game.getDebugState().misses,0)
   h.game.xrHooks.onRequestExit();h.game.xrHooks.onExit();assert.equal(h.audio.paused,true);assert.equal(h.registered.length,0)
@@ -170,7 +171,7 @@ test('conservative geometry budget remains bounded',()=>{
     for(const m of Array.isArray(o.material)?o.material:[o.material])if(m.map)textures.add(m.map)
   })
   console.log('All Eyes On Me all-pools+menus upper bound (excludes shared rays):', {calls,triangles,textures:textures.size})
-  assert.ok(calls<=44);assert.ok(triangles<15000);assert.ok(textures.size<=7)
+  assert.ok(calls<=45);assert.ok(triangles<15000);assert.ok(textures.size<=7)
   h.game.xrHooks.dispose()
 })
 
@@ -218,7 +219,7 @@ test('M2 uses measured beat grid, no simultaneous pairs or downward lanes',()=>{
 })
 test('side eyes follow a fixed front-left/right line with pooled matching chevrons',()=>{
   const root=new THREE.Group(),e=LEVEL.events.find(e=>e.lane==='LS'),r=LEVEL.events.find(e=>e.lane==='RS')
-  assert.equal(isSideTarget(e),true);assert.ok(Math.abs(targetX(e,spawnAt(e)))<1e-9)
+  assert.equal(isSideTarget(e),true);assert.ok(Math.abs(targetX(e,spawnAt(e))-C.portalX)<1e-9)
   assert.ok(Math.abs(targetX(e,e.hitAt)+.55)<1e-9);assert.ok(Math.abs(targetX(r,r.hitAt)-.55)<1e-9)
   assert.ok(Math.abs(Math.atan2(targetX(e,e.hitAt),C.hitDistance))<=Math.PI/4+1e-9)
   const targets=createTargets(root,{events:[e]},()=>{})
@@ -264,4 +265,79 @@ test('impact nodes are capped and stopped on release without changing music gain
     assert.equal(created.length,C.maxImpactVoices);assert.equal(a.volume,C.musicVolume)
     music.release();assert.ok(created.every(v=>v.stopped));assert.equal(a.volume,.43);music.dispose()
   }finally{delete window.AudioContext}
+})
+
+
+test('distant portal matches artwork and joins M2 strike motion continuously',()=>{
+  for(const e of LEVEL.events){
+    assert.equal(targetY(e,spawnAt(e)),C.portalY)
+    const join=nearSpawnAt(e),epsilon=0.00001
+    assert.ok(Math.abs(targetZ(e,join)+C.spawnDistance)<1e-7)
+    assert.ok(Math.abs((targetZ(e,join)-targetZ(e,join-epsilon))/epsilon-speed())<.01)
+    assert.ok(Math.abs(targetX(e,join)-targetX(e,join-epsilon))<.001)
+    assert.ok(Math.abs(targetY(e,join)-targetY(e,join-epsilon))<.001)
+    for(let t=join;t<missAt(e);t+=.02)assert.ok(targetY(e,t)>=-.2)
+  }
+})
+test('authored full-song sections have valid bounds, progression and isolated transitions',()=>{
+  assert.equal(validateLevel(),true)
+  assert.equal(LEVEL.events.filter(e=>e.hand==='left').length,118)
+  assert.equal(LEVEL.events.filter(e=>isSideTarget(e)).length,48)
+  assert.deepEqual(['duck','left','right'].map(kind=>LEVEL.obstacles.filter(o=>o.kind===kind).length),[4,4,3])
+  for(const s of SECTIONS){
+    for(const pair of s.punches.split(' ')){const b=Number(pair.split(':')[0]);assert.ok(b>=s.from&&b<s.to)}
+  }
+  assert.throws(()=>validateLevel({...LEVEL,events:[...LEVEL.events,{...LEVEL.events[0],hitAt:300}]}))
+  assert.throws(()=>validateLevel({...LEVEL,waves:[{at:LEVEL.duration}]}))
+  assert.throws(()=>validateLevel({...LEVEL,obstacles:[{kind:'duck',at:LEVEL.events[1].hitAt}]}))
+})
+test('energy rings stay outside the player, are capped, freeze on pause and dispose',()=>{
+  const root=new THREE.Group(),waves=createWaves(root,LEVEL.waves),mesh=root.children[0],matrix=new THREE.Matrix4(),pos=new THREE.Vector3(),scale=new THREE.Vector3(),q=new THREE.Quaternion()
+  let peak=0
+  for(let t=0;t<LEVEL.duration;t+=1/72){
+    waves.update(t,true);peak=Math.max(peak,waves.stats().activeWaves)
+    for(let i=0;i<C.maxWaves;i++){
+      mesh.getMatrixAt(i,matrix);if(matrix.elements[0]===0)continue;matrix.decompose(pos,q,scale)
+      if(scale.x>0 && Math.abs(pos.z)<2)assert.ok(scale.x>C.waveClearance && Math.abs(pos.x)<.001 && Math.abs(pos.y)<.001)
+    }
+  }
+  assert.equal(peak,2);assert.equal(waves.stats().activeWaves,0)
+  waves.reset();waves.update(2,true);assert.equal(waves.stats().activeWaves,1)
+  waves.update(2,false);assert.equal(mesh.visible,false)
+  waves.update(2,true);assert.equal(waves.stats().activeWaves,1)
+  waves.reset();assert.equal(waves.stats().activeWaves,0)
+  waves.dispose();waves.dispose();assert.equal(root.children.length,0)
+})
+test('audio tail, duplicate ended, mid-round pause and complete replay remain safe',async()=>{
+  const h=harness();await h.start()
+  while(h.audio.currentTime<110)h.tick()
+  const before=h.game.getDebugState().misses
+  h.xr.session.visibilityState='visible-blurred';h.xr.session.dispatchEvent(new Event('visibilitychange'))
+  for(let i=0;i<200;i++)h.tick()
+  assert.equal(h.game.getDebugState().misses,before)
+  h.xr.session.visibilityState='visible';h.tick();h.registered[0].action();await flush()
+  while(h.audio.currentTime<LEVEL.duration+.01)h.tick()
+  assert.equal(h.game.getDebugState().phase,'playing','do not cut the encoded tail at chart duration')
+  while(!h.audio.ended)h.tick()
+  const result=h.game.getDebugState();h.audio.dispatchEvent(new Event('ended'));assert.deepEqual(h.game.getDebugState(),result)
+  h.registered[0].action();for(let i=0;i<218;i++)h.tick();await flush()
+  assert.equal(h.game.getDebugState().misses,0)
+  while(!h.audio.ended)h.tick()
+  assert.equal(h.game.getDebugState().misses,LEVEL.events.length)
+  assert.equal(h.game.getDebugState().result.completed,true);h.game.xrHooks.dispose()
+})
+test('games layout keeps Smash public and all four world buttons separate',()=>{
+  const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8')
+  const publicHTML=source.slice(0,source.indexOf('let smashEntryRequest'))
+  assert.ok(publicHTML.includes('GLAMNIVERSE VR EXPERIENCES'))
+  assert.ok(publicHTML.includes('onclick="openSmashTheHate()"'))
+  assert.equal((publicHTML.match(/class="portal-label/g)||[]).length,4)
+  assert.ok(source.includes("document.querySelector('#vr-experience-grid').appendChild(card)"))
+})
+
+test('portal direction matches actual inward sphere UV orientation',()=>{
+  const theta=Math.PI*400/887,phi=2*Math.PI*901/1774
+  const artwork=new THREE.Vector3(-Math.cos(phi)*Math.sin(theta),Math.cos(theta),Math.sin(phi)*Math.sin(theta)).applyAxisAngle(new THREE.Vector3(0,1,0),C.panoramaYaw)
+  const portal=new THREE.Vector3(C.portalX,C.portalY,-C.portalDistance).normalize()
+  assert.ok(portal.angleTo(artwork)<0.005,'less than 0.3 degree difference at neutral headset')
 })

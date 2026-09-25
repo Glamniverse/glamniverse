@@ -94,14 +94,24 @@ document.querySelector('#app').innerHTML = `
       </p>
 
       <div class="city-box">
-        <h3>A growing universe of musical worlds and interactive experiences.</h3>
+        <h3>Musical worlds to explore.</h3>
         <p>
           Explore Neon Therapy, In His Mind, Late Night Drives and Almost Love.
-          Play SMASH THE HATE — smash the hate. Feel the music.
         </p>
         <button onclick="openPortalWorld()">
-          Explore Glamniverse VR
+          Explore the musical worlds
         </button>
+      </div>
+      <div class="vr-experiences" aria-labelledby="vr-experiences-title">
+        <h3 id="vr-experiences-title">GLAMNIVERSE VR EXPERIENCES</h3>
+        <p>Step inside the music.</p>
+        <div id="vr-experience-grid" class="vr-experience-grid">
+          <article class="vr-experience-card">
+            <h4>SMASH THE HATE</h4>
+            <p>Smash the hate. Feel the music.</p>
+            <button onclick="openSmashTheHate()">SMASH THE HATE</button>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -162,7 +172,6 @@ document.querySelector('#app').innerHTML = `
       <button class="portal-label label-drive" onclick="enterDistrict('lateNightDrives')">
       🚗 Late Night Drives
       </button>
-      <button class="portal-label" style="left:50%;bottom:5%;top:auto;transform:translateX(-50%)" onclick="openSmashTheHate()">SMASH THE HATE</button>
       <section id="smash-info" class="smash-info hidden" aria-labelledby="smash-info-title">
         <h2 id="smash-info-title">SMASH THE HATE</h2>
         <p>Smash the hate. Feel the music.</p>
@@ -1250,7 +1259,11 @@ if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
   import('./games/all-eyes-on-me/index.js').then(({ createAllEyesOnMe }) => {
     const entry = document.createElement('button')
     entry.id = 'all-eyes-test-entry'
-    entry.style.cssText = 'display:block;margin:16px auto 0;max-width:100%;white-space:normal;overflow-wrap:anywhere'
+    const card = document.createElement('article')
+    card.className = 'vr-experience-card'
+    const title = document.createElement('h4'); title.textContent = 'ALL EYES ON ME — VR FITNESS'
+    const description = document.createElement('p'); description.textContent = 'All eyes on you. Keep moving.'
+    card.append(title, description, entry)
     entry.textContent = 'ALL EYES ON ME — VR FITNESS TEST'
     function openEyes() {
       if (deferUntilVRExit(openEyes)) return
@@ -1267,7 +1280,7 @@ if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
     }
     entry.onclick = openEyes
     // Normal document flow: no overlay on any district or music control.
-    document.querySelector('#neon-city .city-box').appendChild(entry)
+    document.querySelector('#vr-experience-grid').appendChild(card)
   }).catch(error => console.warn('All Eyes On Me test entry unavailable:', error))
 }
 

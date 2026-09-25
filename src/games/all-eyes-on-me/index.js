@@ -62,7 +62,7 @@ export function createAllEyesOnMe({ audio, back }) {
     } else if (phase === 'loading') {
       show(['ALL EYES ON ME', audio.error ? 'Audio could not load. Check connection.' : 'Loading All Eyes On Me…'], audio.error ? 'RETRY LOAD' : null)
     } else {
-      show(['ALL EYES ON ME - VR FITNESS', 'PINK = LEFT | BLUE = RIGHT', 'DUCK • LEAN • PUNCH. Small moves; keep your space clear.', healthy ? '56-second test. Misses are harmless. No thumbstick movement.' : 'Track both controllers to begin.'], healthy ? 'START' : null)
+      show(['ALL EYES ON ME - VR FITNESS', 'PINK = LEFT | BLUE = RIGHT', 'DUCK • LEAN • PUNCH. Small moves; keep your space clear.', healthy ? 'Full song • 3:39. Misses are harmless. Stay in place.' : 'Track both controllers to begin.'], healthy ? 'START' : null)
     }
   }
   function pause(reason) {
@@ -73,14 +73,14 @@ export function createAllEyesOnMe({ audio, back }) {
     show(['PAUSED', reason, 'Point and press trigger to resume.'], 'RESUME')
   }
   function finish() {
-    if (phase === 'results' || phase === 'disposed') return
+    if (!['playing', 'starting', 'paused'].includes(phase)) return
     token++; audio.pause(); weapons?.reset(); targets.hide(); obstacles.hide(); fragments.reset(); arena.reset()
     phase = 'results'; xr?.interaction.setMenuRays(true)
     // Any unjudged chart entries become misses if the source ends unexpectedly early.
     score.misses += Math.max(0, level.events.length - score.hits - score.misses)
     result = { completed: audio.currentTime >= level.duration - 0.1, hitRate: score.hits / level.events.length }
     show([result.completed ? 'ALL EYES ON YOU. YOU KEPT MOVING.' : 'AUDIO ENDED EARLY',
-      '56-SECOND PROTOTYPE RESULTS', `Score ${score.score} | Hits ${score.hits} | Misses ${score.misses}`,
+      'FULL-SONG RESULTS', `Score ${score.score} | Hits ${score.hits} | Misses ${score.misses}`,
       `Max combo ${score.maxCombo} | Moves ${score.obstacles}/${level.obstacles.length}`], 'PLAY AGAIN')
   }
   async function playAudio() {
@@ -198,8 +198,8 @@ export function createAllEyesOnMe({ audio, back }) {
           songTime = audio.currentTime
           targets.update(songTime, head)
           obstacles.update(songTime, head)
-          // Deliberately end the labelled prototype; leave the complete master unchanged.
-          if (songTime >= level.duration) finish()
+          // Wait for HTMLAudioElement ended, including the encoded audio tail.
+          // Chart duration never truncates playback or manufactures completion.
         }
       }
       const wasHealthy = healthy
