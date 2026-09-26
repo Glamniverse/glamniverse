@@ -174,8 +174,8 @@ document.querySelector('#app').innerHTML = `
       </button>
       <section id="smash-info" class="smash-info hidden" aria-labelledby="smash-info-title">
         <h2 id="smash-info-title">SMASH THE HATE</h2>
-        <p>Smash the hate. Feel the music.</p>
-        <p>A Glamniverse VR experience powered by I Am Confident.</p>
+        <p id="vr-info-tagline">Smash the hate. Feel the music.</p>
+        <p id="vr-info-track">A Glamniverse VR experience powered by I Am Confident.</p>
         <p id="smash-support-message" role="status"></p>
         <button onclick="dismissSmashInfo()">Back to worlds</button>
       </section>
@@ -387,7 +387,7 @@ function disposeRuntimeRenderer() {
 
 // Stationary XR uses the shared runtime; the portal remains browser-only.
 const stationaryVRWorlds = new Set([
-  'inHisMind', 'neonTherapy', 'lateNightDrives', 'almostLove', 'smashTheHate', ...((import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') ? ['allEyesOnMe'] : [])
+  'inHisMind', 'neonTherapy', 'lateNightDrives', 'almostLove', 'smashTheHate', 'allEyesOnMe'
 ])
 let vrSupported = false
 let vrButton = null
@@ -1223,11 +1223,15 @@ function dismissSmashInfo() {
 }
 window.dismissSmashInfo = dismissSmashInfo
 
-window.openSmashTheHate = async function () {
-  if (deferUntilVRExit(() => window.openSmashTheHate())) return
+// One capability check and warning surface for both public VR games.
+async function checkVRExperienceSupport(experience) {
   // The public route always uses the established portal container/runtime.
   if (document.querySelector('#portal-world').classList.contains('hidden')) window.openPortalWorld()
   const attempt = ++smashEntryRequest
+  const eyes = experience === 'allEyesOnMe'
+  document.querySelector('#smash-info-title').textContent = eyes ? 'ALL EYES ON ME — VR FITNESS' : 'SMASH THE HATE'
+  document.querySelector('#vr-info-tagline').textContent = eyes ? 'All eyes on you. Keep moving.' : 'Smash the hate. Feel the music.'
+  document.querySelector('#vr-info-track').textContent = `A Glamniverse VR experience powered by ${eyes ? 'All Eyes On Me' : 'I Am Confident'}.`
   document.querySelector('#smash-info').classList.remove('hidden')
   document.querySelector('.control-hint').classList.add('hidden')
   const message = document.querySelector('#smash-support-message')
@@ -1238,11 +1242,19 @@ window.openSmashTheHate = async function () {
   } catch (error) {
     console.warn('Unable to check immersive VR support:', error)
   }
-  if (attempt !== smashEntryRequest) return
+  if (attempt !== smashEntryRequest) return false
   if (!supported) {
-    message.textContent = 'VR headset required for the full experience. Open Glamniverse in Meta Quest Browser to play.'
-    return
+    message.textContent = eyes
+      ? 'VR HEADSET REQUIRED. Open Glamniverse in Meta Quest Browser for the full experience.'
+      : 'VR headset required for the full experience. Open Glamniverse in Meta Quest Browser to play.'
+    return false
   }
+  return true
+}
+
+window.openSmashTheHate = async function () {
+  if (deferUntilVRExit(() => window.openSmashTheHate())) return
+  if (!await checkVRExperienceSupport('smashTheHate')) return
   disposeCurrentWorld()
   document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })
   document.querySelector('#district-confirm').classList.add('hidden')
@@ -1254,20 +1266,20 @@ window.openSmashTheHate = async function () {
   startWorldAnimation('smashTheHate', game.scene, game.camera, game.update, null, game.xrHooks)
 }
 
-// Test entry only: Vercel supplies this environment value; Production stays excluded.
-if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
+// Public release: both games share capability gating before world creation.
+{
   import('./games/all-eyes-on-me/index.js').then(({ createAllEyesOnMe }) => {
     const entry = document.createElement('button')
-    entry.id = 'all-eyes-test-entry'
+    entry.id = 'all-eyes-entry'
     const card = document.createElement('article')
     card.className = 'vr-experience-card'
     const title = document.createElement('h4'); title.textContent = 'ALL EYES ON ME — VR FITNESS'
     const description = document.createElement('p'); description.textContent = 'All eyes on you. Keep moving.'
     card.append(title, description, entry)
-    entry.textContent = 'ALL EYES ON ME — VR FITNESS TEST'
-    function openEyes() {
+    entry.textContent = 'ALL EYES ON ME — VR FITNESS'
+    async function openEyes() {
       if (deferUntilVRExit(openEyes)) return
-      if (document.querySelector('#portal-world').classList.contains('hidden')) window.openPortalWorld()
+      if (!await checkVRExperienceSupport('allEyesOnMe')) return
       disposeCurrentWorld()
       document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })
       document.querySelector('#district-confirm').classList.add('hidden')
@@ -1281,7 +1293,7 @@ if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
     entry.onclick = openEyes
     // Normal document flow: no overlay on any district or music control.
     document.querySelector('#vr-experience-grid').appendChild(card)
-  }).catch(error => console.warn('All Eyes On Me test entry unavailable:', error))
+  }).catch(error => console.warn('All Eyes On Me entry unavailable:', error))
 }
 
 function showInHisMindRoom() {

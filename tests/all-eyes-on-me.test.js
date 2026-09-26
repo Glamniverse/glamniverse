@@ -195,15 +195,12 @@ test('real game sweep awards one correct-hand punch and combo only once',async()
   h.game.xrHooks.dispose()
 })
 
-test('actual main entry and XR eligibility gates allow DEV/Preview but exclude Production',()=>{
+test('public All Eyes entry and XR eligibility are enabled without Preview flags',()=>{
   const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8')
-  const expression="import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview'"
-  assert.equal(source.split(expression).length-1,2,'entry and XR eligibility use the same gate')
-  const evaluate=Function('env',`return (${expression.replaceAll('import.meta.env','env')})`)
-  assert.equal(evaluate({DEV:true}),true)
-  assert.equal(evaluate({DEV:false,VITE_VERCEL_ENV:'preview'}),true)
-  assert.equal(evaluate({DEV:false,VITE_VERCEL_ENV:'production'}),false)
-  assert.equal(evaluate({DEV:false}),false)
+  const eligibility=source.slice(source.indexOf('const stationaryVRWorlds'),source.indexOf('let vrSupported'))
+  assert.ok(eligibility.includes("'allEyesOnMe'"))
+  assert.ok(!source.includes('VITE_VERCEL_ENV'))
+  assert.ok(source.includes("if (!await checkVRExperienceSupport('allEyesOnMe')) return"))
 })
 
 test('M2 uses measured beat grid, no simultaneous pairs or downward lanes',()=>{
