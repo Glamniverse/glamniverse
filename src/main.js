@@ -1306,13 +1306,13 @@ if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
     card.className = 'vr-experience-card'
     const title = document.createElement('h4'); title.textContent = 'THE SKY LOFT'
     const description = document.createElement('p'); description.textContent = 'Choose a song. Change your reality.'
-    const entry = document.createElement('button'); entry.id = 'sky-loft-entry'; entry.textContent = 'THE SKY LOFT — M1 PREVIEW'
+    const entry = document.createElement('button'); entry.id = 'sky-loft-entry'; entry.textContent = 'THE SKY LOFT — M2 PREVIEW'
     card.append(title, description, entry)
     async function openLoft() {
       if (deferUntilVRExit(openLoft)) return
       if (!await checkVRExperienceSupport('skyLoft', {
         title: 'THE SKY LOFT', tagline: 'Choose a song. Change your reality.',
-        description: 'A Glamniverse VR loft. M1 music-selector preview.',
+        description: 'A Glamniverse VR loft. Music and a living Neon City.',
       })) return
       disposeCurrentWorld()
       document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })

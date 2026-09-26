@@ -9,7 +9,7 @@ export const ENVIRONMENTS = Object.freeze({
   'sky-city': Object.freeze({
     panorama: '/images/sky-loft/neon-city-loft.png',
     yaw: 0, radius: 180, background: 0x080917,
-    ambient: 0xafa0da, ambientIntensity: 1.7,
+    ambient: 0xafa0da, ambientIntensity: 1.7, visitors: 'neon-mantas',
   }),
 })
 export const SONGS = Object.freeze([
@@ -34,3 +34,6 @@ export function createSelection(onChange = () => {}) {
     dispose() { disposed = true },
   }
 }
+
+// Future licensed/local dog model attaches near the existing sofa; no asset assumed.
+export const COMPANION = Object.freeze({ modelSrc: null, position: [3.5, 0, 3.5] })

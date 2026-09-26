@@ -116,7 +116,7 @@ test('geometry budget is bounded; no transparent materials, shadows or frame ani
       assert.equal(o.material.transparent,false);if(o.material.map)textures.add(o.material.map)}
     if(o.isLight){lights++;assert.ok(!o.castShadow)}
   })
-  assert.ok(calls<=10);assert.ok(triangles<3000);assert.equal(textures.size,5);assert.equal(lights,2)
+  assert.ok(calls<=12);assert.ok(triangles<3000);assert.equal(textures.size,5);assert.equal(lights,2)
   console.log('Sky Loft static budget', {calls,triangles,textures:textures.size+1,lights})
   assert.ok(CONFIG.selectorDistance<5);h.game.xrHooks.dispose()
 })
@@ -192,4 +192,26 @@ test('headset menu pauses music, explicit selection resumes; exit releases media
   assert.equal(h.game.getPlaybackClock().playing,true)
   h.game.xrHooks.onExit();assert.equal(h.game.getPlaybackClock().songId,null)
   h.game.xrHooks.dispose()
+})
+
+import { VISITOR_PROFILE, visitorPosition, createVisitors } from '../src/games/sky-loft/visitors.js'
+test('visitor routes remain outside the loft and never enter the face/room corridor',()=>{
+  const p=new THREE.Vector3()
+  for(const route of VISITOR_PROFILE.routes)for(let i=0;i<=1000;i++){
+    visitorPosition(i/1000,route,p)
+    assert.ok(Math.abs(p.x)>CONFIG.width/2+1 || Math.abs(p.z)>CONFIG.depth/2+1)
+    assert.ok(p.y>3)
+  }
+})
+test('two visitors reuse shared resources across cycles and freeze/reset/dispose safely',()=>{
+  const root=new THREE.Group(),visitors=createVisitors(root)
+  assert.equal(root.children.length,2)
+  assert.equal(root.children[0].children[0].geometry,root.children[1].children[0].geometry)
+  let peak=0
+  for(let i=0;i<18000;i++){visitors.update(i*1000/72,true);peak=Math.max(peak,visitors.stats().activeVisitors)}
+  assert.equal(peak,2);assert.equal(root.children.length,2)
+  visitors.update(999999,false);assert.equal(visitors.stats().activeVisitors,0)
+  visitors.reset();assert.equal(visitors.stats().activeVisitors,0)
+  visitors.apply(null);visitors.update(0,true);assert.equal(visitors.stats().activeVisitors,0)
+  visitors.dispose();visitors.update(1,true);assert.equal(visitors.stats().activeVisitors,0)
 })

@@ -14,7 +14,7 @@ export function createLoftAudio(element, notify = () => {}) {
   }
   function clear() { element.pause(); element.removeAttribute('src'); element.load() }
   const events = {
-    playing: () => { if (current?.audioSrc) setStatus('playing') },
+    playing: () => { if (current?.audioSrc && !element.paused) setStatus('playing') },
     waiting: () => { if (current?.audioSrc && !element.paused) setStatus('loading') },
     ended: () => setStatus('ended'),
     error: () => { element.pause(); if (current?.audioSrc) setStatus('error') },
