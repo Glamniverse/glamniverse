@@ -17,17 +17,18 @@ export function createSelector(parent, onSelect, back) {
     panel.mesh.position.set((i-0.5)*0.86,-0.09,-CONFIG.selectorDistance)
     group.add(panel.mesh); return { song,panel,hover:false }
   })
-  let selected = SONGS[0].id, unregister = [], bound = false
+  let selected = SONGS[0].id, unregister = [], bound = false, playback = 'Select a song to play'
   function refresh() {
     for (const b of buttons) {
       b.panel.draw([b.song.title, b.song.id===selected ? 'SELECTED' : 'SELECT'], b.song.theme.accent)
     }
-    status.draw(['NOW SELECTED — '+SONGS.find(s=>s.id===selected).title, 'M1 selector preview • No playback'], '#ad8ec8')
+    status.draw(['NOW SELECTED — '+SONGS.find(s=>s.id===selected).title, playback], '#ad8ec8')
   }
   refresh()
   return {
     group,
     select(song) { selected=song.id;refresh() },
+    setPlayback(message) { if (message!==playback) {playback=message;refresh()} },
     bind(interaction, enabled) {
       this.unbind(); bound=true
       for (const b of buttons) unregister.push(interaction.addTarget(b.panel.mesh,()=>{

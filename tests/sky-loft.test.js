@@ -8,6 +8,14 @@ import { createEnvironment } from '../src/games/sky-loft/environment.js'
 
 globalThis.document={createElement:()=>({getContext:()=>({fillRect(){},strokeRect(){},fillText(){}})})}
 globalThis.window={innerWidth:1200,innerHeight:800}
+class FakeAudio extends EventTarget {
+  paused=true;currentTime=0;duration=180;src='';plays=0
+  getAttribute(){return this.src}
+  removeAttribute(){this.src=''}
+  load(){this.currentTime=0}
+  pause(){this.paused=true}
+  play(){this.plays++;this.paused=false;return Promise.resolve()}
+}
 function imageLoader(){
   const requests=[]
   return {requests,load(path,ok,progress,fail){
@@ -17,10 +25,10 @@ function imageLoader(){
 }
 function harness(){
   const loader=imageLoader();let backs=0
-  const game=createSkyLoft({back:()=>backs++,environmentLoader:loader})
+  const game=createSkyLoft({back:()=>backs++,environmentLoader:loader,audioFactory:()=>new FakeAudio()})
   const registered=[]
   const origin=new THREE.Group();origin.position.set(0,1.6,0);game.scene.add(origin)
-  const state={origin,session:{visibilityState:'visible'},renderer:{xr:{getReferenceSpace:()=>({})}},
+  const state={origin,session:Object.assign(new EventTarget(),{visibilityState:'visible'}),renderer:{xr:{getReferenceSpace:()=>({})}},
     interaction:{addTarget(object,select,options){const entry={object,select,options};registered.push(entry)
       return()=>{options.onHover?.(false);const i=registered.indexOf(entry);if(i>=0)registered.splice(i,1)}}}}
   let position={x:0,y:0,z:0}
@@ -28,10 +36,10 @@ function harness(){
   return {game,state,registered,loader,backs:()=>backs,
     tick(){game.update(0,frame)},move(p){position=p},enter(){game.xrHooks.onEnter(state);game.update(0,frame)}}
 }
-test('two immutable prototype songs reference valid environment; no playback or lyrics',()=>{
+test('two immutable prototype songs reference valid environment; verified Neon Therapy audio and no lyrics',()=>{
   assert.equal(SONGS.length,2)
   assert.equal(new Set(SONGS.map(s=>s.id)).size,2)
-  for(const song of SONGS){assert.ok(ENVIRONMENTS[song.environmentId]);assert.equal(song.audioSrc,null);assert.equal(song.lyrics,null);assert.ok(Object.isFrozen(song))}
+  for(const song of SONGS){assert.ok(ENVIRONMENTS[song.environmentId]);assert.equal(song.audioSrc,song.id==='neon-therapy'?'/neon-therapy.mp3':null);assert.equal(song.lyrics,null);assert.ok(Object.isFrozen(song))}
 })
 test('selection is validated, idempotent and disabled after disposal',()=>{
   const changes=[];const state=createSelection(song=>changes.push(song.id))
@@ -141,4 +149,47 @@ test('shared warning blocks loft factory without XR and cancels pending Back',as
   assert.equal(nodes.get('#smash-info-title').textContent,'THE SKY LOFT')
   pending=open();gate.dismiss();resolve(true);await pending;assert.equal(created,0)
   pending=open();resolve(true);await pending;assert.equal(created,1)
+})
+
+import { createLoftAudio } from '../src/games/sky-loft/audio.js'
+test('M2 panorama matches unchanged 2:1 source and uses its dedicated environment path',()=>{
+  const path=ENVIRONMENTS['sky-city'].panorama
+  assert.equal(path,'/images/sky-loft/neon-city-loft.png')
+  const bytes=readFileSync(new URL('../public'+path,import.meta.url))
+  assert.equal(bytes.readUInt32BE(16),1774);assert.equal(bytes.readUInt32BE(20),887)
+  assert.ok(readFileSync(new URL('../public/neon-therapy.mp3',import.meta.url)).length>3000000)
+})
+test('audio switches on a single element, missing song stops previous, clock is media time',async()=>{
+  const media=new FakeAudio(),messages=[],audio=createLoftAudio(media,m=>messages.push(m))
+  audio.select(SONGS[0]);await Promise.resolve()
+  assert.equal(media.src,'/neon-therapy.mp3');assert.equal(media.paused,false)
+  media.currentTime=12.4;assert.equal(audio.getClock().seconds,12.4)
+  audio.select(SONGS[0]);assert.equal(media.plays,1)
+  audio.select(SONGS[1]);assert.equal(media.paused,true);assert.equal(media.src,'')
+  assert.equal(audio.getClock().status,'unavailable');assert.match(messages.at(-1),/not available/)
+  audio.select(SONGS[0]);await Promise.resolve();assert.equal(media.plays,2)
+  audio.release();assert.equal(media.paused,true);assert.equal(media.src,'')
+  audio.dispose();audio.dispose()
+})
+test('audio blocked playback, retry, late promises and disposal fail safely',async()=>{
+  const media=new FakeAudio(),audio=createLoftAudio(media)
+  media.play=()=>Promise.reject(Error('blocked'))
+  audio.select(SONGS[0]);await Promise.resolve();await Promise.resolve()
+  assert.equal(audio.getClock().status,'error');assert.equal(media.paused,true)
+  let resolve
+  media.play=()=>new Promise(r=>resolve=r)
+  audio.select(SONGS[0]);audio.select(SONGS[1]);resolve();await Promise.resolve()
+  assert.equal(audio.getClock().status,'unavailable')
+  audio.select(SONGS[0]);audio.dispose();resolve();await Promise.resolve()
+  assert.equal(media.src,'');assert.equal(audio.getClock().playing,false)
+})
+test('headset menu pauses music, explicit selection resumes; exit releases media',async()=>{
+  const h=harness();h.enter();h.registered[0].select();await Promise.resolve()
+  assert.equal(h.game.getPlaybackClock().playing,true)
+  h.state.session.visibilityState='hidden';h.state.session.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(h.game.getPlaybackClock().playing,false)
+  h.state.session.visibilityState='visible';h.registered[0].select();await Promise.resolve()
+  assert.equal(h.game.getPlaybackClock().playing,true)
+  h.game.xrHooks.onExit();assert.equal(h.game.getPlaybackClock().songId,null)
+  h.game.xrHooks.dispose()
 })

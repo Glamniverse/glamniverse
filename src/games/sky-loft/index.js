@@ -3,9 +3,10 @@ import { CONFIG, createSelection } from './config.js'
 import { createLoft } from './loft.js'
 import { createEnvironment } from './environment.js'
 import { createSelector } from './selector.js'
+import { createLoftAudio } from './audio.js'
 
-// No renderer, requestSession, scheduler, controller listeners, or audio player here.
-export function createSkyLoft({ back, environmentLoader } = {}) {
+// No renderer, requestSession, scheduler, controller listeners, or shared-site audio player here.
+export function createSkyLoft({ back, environmentLoader, audioFactory = () => new Audio() } = {}) {
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x080917)
   const camera = new THREE.PerspectiveCamera(70,window.innerWidth/window.innerHeight,0.05,250)
   camera.position.set(0,CONFIG.virtualEyeHeight,0)
@@ -13,7 +14,8 @@ export function createSkyLoft({ back, environmentLoader } = {}) {
   const loft = createLoft(place), environment = createEnvironment(place,environmentLoader)
   const menuAnchor = new THREE.Group(); scene.add(menuAnchor); menuAnchor.position.y=CONFIG.virtualEyeHeight
   let xr=null,disposed=false,placed=false
-  const selector=createSelector(menuAnchor,id=>selection.select(id),back)
+  const selector=createSelector(menuAnchor,id=>{selection.select(id);music.select(selection.get())},back)
+  const music=createLoftAudio(audioFactory(),message=>selector.setPlayback(message))
   const selection=createSelection(song=>{
     environment.apply(song.environmentId);loft.setTheme(song.theme);selector.select(song)
   })
@@ -21,9 +23,13 @@ export function createSkyLoft({ back, environmentLoader } = {}) {
   // Reused temporaries; only first valid XR pose anchors room/UI. Never moves camera.
   const head=new THREE.Vector3(),forward=new THREE.Vector3(),q=new THREE.Quaternion(),originQ=new THREE.Quaternion()
   const enabled=()=>!disposed&&placed&&xr&&!xr.attaching&&!xr.cancelled&&!xr.ended&&xr.session.visibilityState==='visible'
-  const unbind=()=>{selector.unbind();xr=null;placed=false}
+  let onVisibility = null
+  const unbind=()=>{
+    if(xr && onVisibility) xr.session.removeEventListener('visibilitychange',onVisibility)
+    onVisibility=null;selector.unbind();music.release();xr=null;placed=false
+  }
   return {
-    scene,camera,
+    scene,camera, getPlaybackClock: music.getClock,
     getDebugState:()=>({disposed,placed,selected:selection.get().id,...selector.stats(),...environment.stats(),loftInstances:loft.instances}),
     update(time,frame) {
       if(disposed||!xr||placed||!frame||xr.attaching||xr.cancelled||xr.ended||xr.session.visibilityState!=='visible')return
@@ -44,13 +50,17 @@ export function createSkyLoft({ back, environmentLoader } = {}) {
     },
     xrHooks:{
       stationary:true,ownsAudio:true,customUI:true,
-      onEnter(state){selector.unbind();xr=state;placed=false;selector.bind(state.interaction,enabled)},
-      onRequestExit(){selector.unbind();placed=false},
+      onEnter(state){
+        unbind();xr=state;placed=false;selector.bind(state.interaction,enabled)
+        onVisibility=()=>{if(state.session.visibilityState!=='visible')music.pause()}
+        state.session.addEventListener('visibilitychange',onVisibility)
+      },
+      onRequestExit(){music.release();selector.unbind();placed=false},
       onExit:unbind,
       suspend:unbind,
       dispose(){
         if(disposed)return
-        disposed=true;unbind();selection.dispose();environment.dispose()
+        disposed=true;unbind();selection.dispose();music.dispose();environment.dispose()
         // Shared createWorldLifecycle disposes all remaining scene graphics exactly once.
       },
     },

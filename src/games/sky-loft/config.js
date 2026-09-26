@@ -4,16 +4,16 @@ export const CONFIG = Object.freeze({
   virtualEyeHeight: 1.6, // local reference space has no physical floor estimate
 })
 
-// M1 selections share ONE placeholder view. No final song worlds or playback yet.
+// M2 songs share the dedicated Neon City; future environments remain data-driven.
 export const ENVIRONMENTS = Object.freeze({
   'sky-city': Object.freeze({
-    panorama: '/images/smash-the-hate/arena-360.png',
+    panorama: '/images/sky-loft/neon-city-loft.png',
     yaw: 0, radius: 180, background: 0x080917,
     ambient: 0xafa0da, ambientIntensity: 1.7,
   }),
 })
 export const SONGS = Object.freeze([
-  Object.freeze({ id: 'neon-therapy', title: 'Neon Therapy', audioSrc: null,
+  Object.freeze({ id: 'neon-therapy', title: 'Neon Therapy', audioSrc: '/neon-therapy.mp3',
     environmentId: 'sky-city', theme: Object.freeze({ accent: '#66d9ef' }), lyrics: null }),
   Object.freeze({ id: 'daydream', title: 'Daydream', audioSrc: null,
     environmentId: 'sky-city', theme: Object.freeze({ accent: '#d5a5ef' }), lyrics: null }),
