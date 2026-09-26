@@ -368,7 +368,7 @@ function resumeRuntime() {
 }
 
 function startWorldAnimation(worldId, scene, camera, update, xrMemory = null, xrHooks = null) {
-  document.querySelector('.control-hint').classList.toggle('hidden', (worldId === 'smashTheHate' || worldId === 'allEyesOnMe'))
+  document.querySelector('.control-hint').classList.toggle('hidden', (worldId === 'smashTheHate' || worldId === 'allEyesOnMe' || worldId === 'skyLoft'))
   activeWorld = { worldId, scene, camera, update, xrMemory, xrHooks }
   resumeRuntime()
   updateVRControl()
@@ -1223,15 +1223,15 @@ function dismissSmashInfo() {
 }
 window.dismissSmashInfo = dismissSmashInfo
 
-// One capability check and warning surface for both public VR games.
-async function checkVRExperienceSupport(experience) {
+// One capability check and warning surface; optional copy supports Preview experiences.
+async function checkVRExperienceSupport(experience, copy = null) {
   // The public route always uses the established portal container/runtime.
   if (document.querySelector('#portal-world').classList.contains('hidden')) window.openPortalWorld()
   const attempt = ++smashEntryRequest
   const eyes = experience === 'allEyesOnMe'
-  document.querySelector('#smash-info-title').textContent = eyes ? 'ALL EYES ON ME — VR FITNESS' : 'SMASH THE HATE'
-  document.querySelector('#vr-info-tagline').textContent = eyes ? 'All eyes on you. Keep moving.' : 'Smash the hate. Feel the music.'
-  document.querySelector('#vr-info-track').textContent = `A Glamniverse VR experience powered by ${eyes ? 'All Eyes On Me' : 'I Am Confident'}.`
+  document.querySelector('#smash-info-title').textContent = copy?.title ?? (eyes ? 'ALL EYES ON ME — VR FITNESS' : 'SMASH THE HATE')
+  document.querySelector('#vr-info-tagline').textContent = copy?.tagline ?? (eyes ? 'All eyes on you. Keep moving.' : 'Smash the hate. Feel the music.')
+  document.querySelector('#vr-info-track').textContent = copy?.description ?? `A Glamniverse VR experience powered by ${eyes ? 'All Eyes On Me' : 'I Am Confident'}.`
   document.querySelector('#smash-info').classList.remove('hidden')
   document.querySelector('.control-hint').classList.add('hidden')
   const message = document.querySelector('#smash-support-message')
@@ -1244,7 +1244,7 @@ async function checkVRExperienceSupport(experience) {
   }
   if (attempt !== smashEntryRequest) return false
   if (!supported) {
-    message.textContent = eyes
+    message.textContent = (eyes || copy)
       ? 'VR HEADSET REQUIRED. Open Glamniverse in Meta Quest Browser for the full experience.'
       : 'VR headset required for the full experience. Open Glamniverse in Meta Quest Browser to play.'
     return false
@@ -1296,6 +1296,39 @@ window.openSmashTheHate = async function () {
   }).catch(error => console.warn('All Eyes On Me entry unavailable:', error))
 }
 
+
+// Fail closed outside Vite dev / Vercel Preview. Rollup removes the loft import
+// and entry from ordinary Production builds; no hostname guessing or settings changes.
+if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
+  stationaryVRWorlds.add('skyLoft')
+  import('./games/sky-loft/index.js').then(({ createSkyLoft }) => {
+    const card = document.createElement('article')
+    card.className = 'vr-experience-card'
+    const title = document.createElement('h4'); title.textContent = 'THE SKY LOFT'
+    const description = document.createElement('p'); description.textContent = 'Choose a song. Change your reality.'
+    const entry = document.createElement('button'); entry.id = 'sky-loft-entry'; entry.textContent = 'THE SKY LOFT — M1 PREVIEW'
+    card.append(title, description, entry)
+    async function openLoft() {
+      if (deferUntilVRExit(openLoft)) return
+      if (!await checkVRExperienceSupport('skyLoft', {
+        title: 'THE SKY LOFT', tagline: 'Choose a song. Change your reality.',
+        description: 'A Glamniverse VR loft. M1 music-selector preview.',
+      })) return
+      disposeCurrentWorld()
+      document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })
+      document.querySelector('#district-confirm').classList.add('hidden')
+      document.querySelector('#district-exit').classList.remove('hidden')
+      document.querySelector('#song-modal').classList.add('hidden')
+      document.querySelector('#song-video').pause()
+      document.querySelector('#song-audio').pause()
+      const loft = createSkyLoft({ back: () => window.returnToPortal() })
+      createWorldLifecycle(loft.scene)
+      startWorldAnimation('skyLoft', loft.scene, loft.camera, loft.update, null, loft.xrHooks)
+    }
+    entry.onclick = openLoft
+    document.querySelector('#vr-experience-grid').appendChild(card)
+  }).catch(error => console.warn('Sky Loft Preview entry unavailable:', error))
+}
 function showInHisMindRoom() {
   disposeCurrentWorld()
   document.querySelectorAll('.portal-label').forEach((label) => {

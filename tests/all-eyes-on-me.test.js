@@ -199,7 +199,7 @@ test('public All Eyes entry and XR eligibility are enabled without Preview flags
   const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8')
   const eligibility=source.slice(source.indexOf('const stationaryVRWorlds'),source.indexOf('let vrSupported'))
   assert.ok(eligibility.includes("'allEyesOnMe'"))
-  assert.ok(!source.includes('VITE_VERCEL_ENV'))
+  assert.ok(!source.slice(source.indexOf('// Public release:'),source.indexOf('// Fail closed')).includes('VITE_VERCEL_ENV'))
   assert.ok(source.includes("if (!await checkVRExperienceSupport('allEyesOnMe')) return"))
 })
 
