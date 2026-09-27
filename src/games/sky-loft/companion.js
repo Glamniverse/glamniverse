@@ -14,9 +14,9 @@ function release(model){
   })
   resources.forEach(r=>r.dispose())
 }
-export function createCompanion(parent,loader=new GLTFLoader()) {
+export function createCompanion(parent,loader=new GLTFLoader(),onGreeting=()=>{}) {
   const group=new THREE.Group();group.name='SkyLoft_Bichon';group.visible=false;parent.add(group)
-  const motor=createCompanionMotion(),localHead=new THREE.Vector3()
+  const motor=createCompanionMotion(),localHead=new THREE.Vector3(),dogWorld=new THREE.Vector3()
   let disposed=false,requested=false,model=null,mixer=null,last=null,current=null,previousState=null,error=null,triangles=0,draws=0
   const actions={}
   const animate=name=>{
@@ -42,6 +42,7 @@ export function createCompanion(parent,loader=new GLTFLoader()) {
       },undefined,()=>{if(!disposed)error='Bichon unavailable; loft remains usable'})
     },
     reset,
+    getWorldPosition(out){group.getWorldPosition(out);out.y+=.3;return Boolean(model&&group.visible)},
     update(time,headWorld,enabled){
       if(disposed)return
       if(!enabled||!model||!headWorld||!Number.isFinite(time)){group.visible=false;last=null;return}
@@ -51,7 +52,7 @@ export function createCompanion(parent,loader=new GLTFLoader()) {
       group.visible=Math.hypot(group.position.x-localHead.x,group.position.z-localHead.z)>=C.hideDistance
       let turn=motor.yaw-group.rotation.y;turn=Math.atan2(Math.sin(turn),Math.cos(turn))
       group.rotation.y+=turn*Math.min(1,dt*5)
-      if(motor.state==='HAPPY'&&previousState!=='HAPPY')animate('HappyHop')
+      if(motor.state==='HAPPY'&&previousState!=='HAPPY'){animate('HappyHop');group.getWorldPosition(dogWorld);dogWorld.y+=.3;onGreeting(time/1000,dogWorld)}
       else if(motor.state!=='HAPPY')animate(motor.moving?'Trot':'Idle')
       else if(current===actions.HappyHop&&current.time>=current.getClip().duration)animate('Idle')
       previousState=motor.state;mixer.update(dt)

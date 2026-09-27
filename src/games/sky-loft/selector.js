@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { makePanel } from '../smash-the-hate/ui.js'
 import { SONGS, CONFIG } from './config.js'
 
-export function createSelector(parent, onSelect, back) {
+export function createSelector(parent, onSelect, back, onMovement=()=>{}) {
   const group = new THREE.Group(); parent.add(group)
   const heading = makePanel(1.65,0.3,1024,192)
   heading.draw(['GLAMNIVERSE', 'CHOOSE YOUR REALITY'], '#ad8ec8')
@@ -10,8 +10,13 @@ export function createSelector(parent, onSelect, back) {
   const status = makePanel(1.65,0.25,1024,160)
   status.mesh.position.set(0,-0.49,-CONFIG.selectorDistance)
   const exit = makePanel(1.1,0.17,768,128)
-  exit.draw(['BACK TO GLAMNIVERSE'], '#ad8ec8'); exit.mesh.position.set(0,-0.79,-CONFIG.selectorDistance)
-  group.add(heading.mesh,status.mesh,exit.mesh)
+  exit.draw(['BACK TO GLAMNIVERSE'], '#ad8ec8'); exit.mesh.position.set(0,-1.06,-CONFIG.selectorDistance)
+  const movement=makePanel(1.65,.23,1024,160)
+  movement.mesh.position.set(0,-.78,-CONFIG.selectorDistance)
+  let motion='stationary'
+  function movementLabel(){movement.draw(motion==='slow'?['SLOW MOVE - SELECT TO STOP','LEFT STICK MOVE / RIGHT STICK SNAP']:['MOVEMENT OFF - SELECT TO EXPLORE','SLOW MOVEMENT + SNAP TURN'], '#ad8ec8')}
+  movementLabel()
+  group.add(heading.mesh,status.mesh,exit.mesh,movement.mesh)
   const buttons = SONGS.map((song,i) => {
     const panel = makePanel(0.79,0.29,512,192)
     panel.mesh.position.set((i-0.5)*0.86,-0.09,-CONFIG.selectorDistance)
@@ -27,6 +32,7 @@ export function createSelector(parent, onSelect, back) {
   refresh()
   return {
     group,
+    setMovement(mode){motion=mode;movementLabel()},
     select(song) { selected=song.id;refresh() },
     setPlayback(message) { if (message!==playback) {playback=message;refresh()} },
     bind(interaction, enabled) {
@@ -39,11 +45,12 @@ export function createSelector(parent, onSelect, back) {
         b.panel.mesh.material.color.set(hover?0xddefff:0xffffff)
       }}))
       unregister.push(interaction.addTarget(exit.mesh,()=>{if(enabled())back()},{owned:false,enabled}))
+      unregister.push(interaction.addTarget(movement.mesh,()=>{if(enabled()){motion=motion==='slow'?'stationary':'slow';movementLabel();onMovement(motion)}},{owned:false,enabled}))
     },
     unbind() {
       unregister.splice(0).forEach(remove=>remove());bound=false
       for(const b of buttons) {b.hover=false;b.panel.mesh.scale.setScalar(1);b.panel.mesh.material.color.setHex(0xffffff)}
     },
-    stats:()=>({registeredTargets:bound?3:0,selected}),
+    stats:()=>({registeredTargets:bound?4:0,selected}),
   }
 }

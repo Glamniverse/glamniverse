@@ -34,7 +34,7 @@ function harness(){
   let position={x:0,y:0,z:0}
   const frame={getViewerPose:()=>({transform:{position,orientation:{x:0,y:0,z:0,w:1}}})}
   return {game,state,registered,loader,backs:()=>backs,
-    tick(){game.update(0,frame)},move(p){position=p},enter(){game.xrHooks.onEnter(state);game.update(0,frame)}}
+    tick(time=0){game.update(time,frame)},move(p){position=p},enter(){game.xrHooks.onEnter(state);game.update(0,frame)}}
 }
 test('two immutable prototype songs reference valid environment; verified Neon Therapy audio and no lyrics',()=>{
   assert.equal(SONGS.length,2)
@@ -50,7 +50,7 @@ test('selection is validated, idempotent and disabled after disposal',()=>{
 test('one panorama reused across repeated selections; no duplicate texture requests',()=>{
   const h=harness();h.enter()
   for(let i=0;i<30;i++)h.registered[i%2].select()
-  assert.equal(h.loader.requests.length,1);assert.equal(h.game.getDebugState().registeredTargets,3)
+  assert.equal(h.loader.requests.length,1);assert.equal(h.game.getDebugState().registeredTargets,4)
   h.game.xrHooks.dispose();assert.equal(h.registered.length,0)
 })
 test('selector targets ray-hit/miss, hover restoration and selection state',()=>{
@@ -85,7 +85,7 @@ test('invalid pose / pending XR / hidden session cannot select; recovery is clea
 })
 test('Back, interrupted exit, repeated sessions and idempotent disposal unregister all targets',()=>{
   const h=harness()
-  for(let i=0;i<10;i++){h.enter();h.game.xrHooks.onEnter(h.state);h.tick();assert.equal(h.registered.length,3)
+  for(let i=0;i<10;i++){h.enter();h.game.xrHooks.onEnter(h.state);h.tick();assert.equal(h.registered.length,4)
     h.registered[2].select();h.game.xrHooks.onRequestExit();assert.equal(h.registered.length,0)
     h.game.xrHooks.onExit();assert.equal(h.game.getDebugState().placed,false)}
   assert.equal(h.backs(),10)
@@ -116,7 +116,7 @@ test('geometry budget is bounded; no transparent materials, shadows or frame ani
       assert.equal(o.material.transparent,false);if(o.material.map)textures.add(o.material.map)}
     if(o.isLight){lights++;assert.ok(!o.castShadow)}
   })
-  assert.ok(calls<=12);assert.ok(triangles<3000);assert.equal(textures.size,5);assert.equal(lights,2)
+  assert.ok(calls<=13);assert.ok(triangles<3000);assert.equal(textures.size,6);assert.equal(lights,2)
   console.log('Sky Loft static budget', {calls,triangles,textures:textures.size+1,lights})
   assert.ok(CONFIG.selectorDistance<5);h.game.xrHooks.dispose()
 })
@@ -214,4 +214,22 @@ test('two visitors reuse shared resources across cycles and freeze/reset/dispose
   visitors.reset();assert.equal(visitors.stats().activeVisitors,0)
   visitors.apply(null);visitors.update(0,true);assert.equal(visitors.stats().activeVisitors,0)
   visitors.dispose();visitors.update(1,true);assert.equal(visitors.stats().activeVisitors,0)
+})
+
+test('exploration selector preserves song rays and resets movement/rig on XR re-entry',()=>{
+  const h=harness()
+  const left={connected:true,controller:{visible:true},source:{handedness:'left',gamepad:{mapping:'xr-standard',axes:[0,0,0,0]}}}
+  h.state.interaction.controllers=[left];h.enter()
+  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,4)
+  h.registered[3].select();assert.equal(h.game.getDebugState().movement,'slow');h.tick(16)
+  left.source.gamepad.axes[2]=1
+  for(let i=2;i<65;i++)h.tick(i*16)
+  assert.ok(h.state.origin.position.x>.3);assert.equal(h.state.origin.position.y,1.6)
+  h.registered[1].select();assert.equal(h.game.getDebugState().selected,'daydream')
+  h.state.session.visibilityState='hidden';h.state.session.dispatchEvent(new Event('visibilitychange'))
+  const x=h.state.origin.position.x;h.tick(2000);assert.equal(h.state.origin.position.x,x)
+  h.state.session.visibilityState='visible';h.tick(2016);h.tick(2032);assert.equal(h.state.origin.position.x,x)
+  h.game.xrHooks.onExit();assert.equal(h.state.origin.position.x,0);h.enter()
+  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,4)
+  h.game.xrHooks.dispose();assert.equal(h.registered.length,0)
 })

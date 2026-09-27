@@ -28,6 +28,12 @@ export function createCompanionMotion() {
         }else{nextAnchor();enter('WANDER')}
         stage++
       }
+      // Track a relocating user only inside the approved clear dog region.
+      if(state==='APPROACH_USER'){
+        if(!safeHead(head))enter('IDLE')
+        else if(hd<=c.stopDistance+.015)enter('HAPPY')
+        else{target.x=head.x+hx/hd*c.stopDistance;target.z=head.z+hz/hd*c.stopDistance}
+      }
       if(state==='HAPPY'){
         yaw=Math.atan2(p.x-head.x,p.z-head.z)
         if(elapsed>4){nextAnchor();enter('WANDER_AWAY')}

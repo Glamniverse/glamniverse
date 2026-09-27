@@ -83,3 +83,44 @@ No changes to panorama, songs, visitors or public/Production eligibility.
 Quest review: watch two minutes for wandering/approach/hop/departure; inspect gait,
 paw sliding, scale, distance, turning and frame stability; select songs and repeat
 XR exit/re-entry plus Back/reopen. Animation polish still requires hardware review.
+
+## M2.2 greeting audio and exploration
+Bark recording still required. No suitable local licensed recording was found;
+BARK.src=null deliberately prevents requests or AudioContext creation. No synthesized
+stand-in is shipped. Supply a short gentle small-dog greeting (one/two barks, <1.5s),
+mono Ogg Vorbis, 44.1/48kHz, no music/reverb, peak <= -6dBFS, preferably <100KB, at
+public/audio/sky-loft/bichon-greeting.ogg. Supply source/author and explicit website
+redistribution permission (or an original owner recording) before setting BARK.src.
+
+Prepared audio path: one voice per HAPPY transition, >=12s between greetings,
+0.12 gain, inverse distance attenuation, refDistance 1m, rolloff 1.5, maxDistance 10m.
+Emitter follows the dog's mouth at +0.3m; listener follows the actual XR head.
+Audio activation is attempted on XR entry/song selection/movement selection;
+blocked playback or missing audio stays silent. Pause/exit stops voices; disposal
+closes the private context. No shared music volume or playback changes. Actual
+loudness/cuteness remains unverified until a suitable recording and Quest test.
+
+Movement defaults OFF each entry. Select MOVEMENT OFF on the loft selector to opt
+into slow exploration: left xr-standard axes[2,3] move relative to horizontal gaze,
+right horizontal stick snaps 30 degrees. Speed <=0.45m/s, deadzone .22, snap threshold
+.7, neutral release required, .45s snap cooldown. Invalid/tracking-lost/hidden states
+require neutral before resuming. No vertical movement. Rig resets on exit/re-entry.
+Shared district locomotion stays disabled for Sky Loft; its own movement module
+moves only XR origin. Shared rays and song selection are unchanged.
+
+The existing 14x12m floor is bounded to x +/-6.35, z +/-5.15 with 0.35m inflated
+sofa/table/pedestal/rear-wall exclusions from loft.js. Swept segment tests block
+crossing solids. Physical headset offset is included; turns pivot about the head.
+Blocked steps stop rather than sliding. If physical walking leaves the valid region,
+artificial movement stops until the user physically returns. Software cannot restrain
+real walking: retain Quest Guardian and stay within the real safe play area.
+Teleportation deferred; no new aim/button conflicts. Stationary mode is the comfort
+fallback. Stop slow movement if uncomfortable; this is not a motion-sickness guarantee.
+
+Dog approach re-targets the current head only within its original smaller clear floor
+region. It will not follow onto all terrace areas or through furniture. Model/GLB,
+clips, speed, happy behavior and close-distance hiding remain unchanged.
+One added selector panel: +1 draw, +2 triangles, +1 canvas texture. Upper estimate
+22 draws/eye, 25,652 triangles, seven existing/UI image textures plus one skeleton
+texture, same two lights. Movement uses a handful of rectangle tests per moving frame;
+no physics/raycast navigation, new lights or dependencies. Bark is silent until supplied.
