@@ -25,7 +25,7 @@ function imageLoader(){
 }
 function harness(){
   const loader=imageLoader();let backs=0
-  const game=createSkyLoft({back:()=>backs++,environmentLoader:loader,audioFactory:()=>new FakeAudio()})
+  const game=createSkyLoft({back:()=>backs++,environmentLoader:loader,companionLoader:{load(){}},audioFactory:()=>new FakeAudio()})
   const registered=[]
   const origin=new THREE.Group();origin.position.set(0,1.6,0);game.scene.add(origin)
   const state={origin,session:Object.assign(new EventTarget(),{visibilityState:'visible'}),renderer:{xr:{getReferenceSpace:()=>({})}},

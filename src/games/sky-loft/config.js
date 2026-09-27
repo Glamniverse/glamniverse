@@ -35,5 +35,5 @@ export function createSelection(onChange = () => {}) {
   }
 }
 
-// Future licensed/local dog model attaches near the existing sofa; no asset assumed.
-export const COMPANION = Object.freeze({ modelSrc: null, position: [3.5, 0, 3.5] })
+// Original Bichon M2; loader/motion configuration lives with the companion.
+export { COMPANION_SETTINGS as COMPANION } from './companion-motion.js'

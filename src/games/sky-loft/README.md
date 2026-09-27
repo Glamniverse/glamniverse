@@ -38,8 +38,7 @@ second route passes along the exterior right side. All path points remain outsid
 Hidden headset pauses their local elapsed time; sessions reset it. Max two active.
 No per-frame allocations, spawning, picking or collisions for visitors.
 Scene disposer owns geometry/materials; visitor module hides/resets on exit/disposal.
-Dog deferred — suitable 3D asset required. COMPANION.modelSrc remains null, with a future
-sofa-side anchor; nothing is downloaded or created.
+Original Bichon companion now loads through companion.js; see below.
 
 ## Validation / build
 node --test tests/*.test.js
@@ -57,3 +56,30 @@ Therapy, Daydream, Neon Therapy rapidly; confirm one song, unavailable message a
 Watch at least 90 seconds for both manta paths, nearby silhouette, depth and comfort.
 Try headset menu/reselect, controller reconnect, Back, system exit/re-entry and reopening.
 Compare frame stability with M1. No new Quest validation is claimed.
+
+## Original Bichon M2 companion
+One 753,672-byte GLB, seven skinned meshes, 23,088 triangles, three opaque materials,
+25 bones, no image textures. Blender sources remain in the separate Bichon workspace.
+Idle (4s), in-place diagonal Trot (0.8s), HappyHop (1.6s, ~2.8cm lift).
+Model is kept at exported metre scale (~0.4175m crown height); no added lights/shadows.
+
+companion-motion.js owns beginner-tunable speed (0.192m/s), anchors, bounds and distances.
+A furniture-free floor rectangle x[-3.8,3.8], z[-1.1,1.1] avoids sofa, table and selector.
+IDLE -> WANDER -> IDLE -> APPROACH_USER -> HAPPY -> WANDER_AWAY.
+Approach stops 1.05m centre-to-headset-floor-projection (about 0.77m nose clearance).
+Physical user movement can reduce that gap: locomotion stops, and the dog hides under
+0.55m centre distance rather than clipping through the user. This is not physics.
+Headset outside the safe rectangle does not attract the dog outside the loft.
+
+companion.js loads once per world, blends actions over 0.18s, pauses/hides without a
+valid visible XR pose, resets on session exit, reuses one model on session re-entry,
+and releases geometry/materials/skeleton resources on world disposal. Late loads
+are released; failed/missing assets never block the loft or music. No dog audio.
+The same existing local-reference-space virtual floor limitation remains.
+
+Upper scene estimate: 21 draws/eye, 25,650 triangles (+36 line segments), six existing
+image/UI textures plus one shared skeleton data texture; same two lights.
+No changes to panorama, songs, visitors or public/Production eligibility.
+Quest review: watch two minutes for wandering/approach/hop/departure; inspect gait,
+paw sliding, scale, distance, turning and frame stability; select songs and repeat
+XR exit/re-entry plus Back/reopen. Animation polish still requires hardware review.
