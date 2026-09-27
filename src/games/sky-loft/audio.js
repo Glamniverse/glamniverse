@@ -21,6 +21,11 @@ export function createLoftAudio(element, notify = () => {}) {
   }
   for (const [name,handler] of Object.entries(events)) element.addEventListener(name,handler)
   return {
+    refreshStatus() { if (!disposed) notify(labels[status]) },
+    // First song selected in a fresh session may need play() directly inside the controller gesture.
+    prime(song) { if (!current && !disposed) { element.volume=0; this.select(song); return true } return false },
+    restart(song) { if (current?.id===song.id) { try { element.currentTime=0 } catch {} } this.select(song) },
+    setGain(value) { if (!disposed) element.volume = 0.65 * Math.max(0, Math.min(1, value)) },
     select(song) {
       if (disposed) return
       const same = current?.id === song.id && element.getAttribute('src') === song.audioSrc

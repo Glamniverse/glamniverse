@@ -1,10 +1,11 @@
 import * as THREE from 'three'
-import { CONFIG, ENVIRONMENTS, createSelection } from './config.js'
+import { CONFIG } from './config.js'
 import { createLoft } from './loft.js'
 import { createEnvironment } from './environment.js'
 import { createSelector } from './selector.js'
 import { createLoftAudio } from './audio.js'
-import { createVisitors } from './visitors.js'
+import { createRealityVisitors } from './reality-visitors.js'
+import { createRealityEngine } from './reality.js'
 import { createCompanion } from './companion.js'
 import { createExploration } from './exploration.js'
 import { createBarkAudio } from './bark.js'
@@ -16,30 +17,27 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, audioF
   camera.position.set(0,CONFIG.virtualEyeHeight,0)
   const place = new THREE.Group(); scene.add(place)
   const loft = createLoft(place), environment = createEnvironment(place,environmentLoader)
-  const visitors = createVisitors(place)
+  const visitors = createRealityVisitors(place)
   const bark=createBarkAudio(),exploration=createExploration(place)
   const companion = createCompanion(place,companionLoader,(time,position)=>bark.greet(time,position))
   const menuAnchor = new THREE.Group(); scene.add(menuAnchor); menuAnchor.position.y=CONFIG.virtualEyeHeight
   let xr=null,disposed=false,placed=false
-  const selector=createSelector(menuAnchor,id=>{bark.activate();selection.select(id);music.select(selection.get())},back,mode=>{bark.activate();exploration.setMode(mode)})
+  const selector=createSelector(menuAnchor,id=>{bark.activate();reality.select(id)},back,mode=>{bark.activate();exploration.setMode(mode)})
   const music=createLoftAudio(audioFactory(),message=>selector.setPlayback(message))
-  const selection=createSelection(song=>{
-    environment.apply(song.environmentId);loft.setTheme(song.theme);selector.select(song)
-    visitors.apply(ENVIRONMENTS[song.environmentId].visitors)
-  })
-  const initial=selection.get();environment.apply(initial.environmentId);loft.setTheme(initial.theme);visitors.apply(ENVIRONMENTS[initial.environmentId].visitors)
+  const reality=createRealityEngine({environment,loft,visitors,music,onSelect:song=>selector.select(song),notify:message=>selector.setPlayback(message)})
   // Reused temporaries; only first valid XR pose anchors room/UI. Never moves camera.
   const head=new THREE.Vector3(),forward=new THREE.Vector3(),q=new THREE.Quaternion(),originQ=new THREE.Quaternion(),dogPosition=new THREE.Vector3()
   const enabled=()=>!disposed&&placed&&xr&&!xr.attaching&&!xr.cancelled&&!xr.ended&&xr.session.visibilityState==='visible'
   let onVisibility = null
   const unbind=()=>{
     if(xr && onVisibility) xr.session.removeEventListener('visibilitychange',onVisibility)
-    onVisibility=null;selector.unbind();music.release();visitors.reset();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');xr=null;placed=false
+    onVisibility=null;selector.unbind();music.release();reality.reset();visitors.reset();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');xr=null;placed=false
   }
   return {
     scene,camera, getPlaybackClock: music.getClock,
-    getDebugState:()=>({disposed,placed,movement:exploration.mode,selected:selection.get().id,...selector.stats(),...environment.stats(),...visitors.stats(),...companion.stats(),loftInstances:loft.instances}),
+    getDebugState:()=>({disposed,placed,movement:exploration.mode,...reality.stats(),...selector.stats(),...environment.stats(),...visitors.stats(),...companion.stats(),loftInstances:loft.instances}),
     update(time,frame) {
+      reality.update(time, Boolean(frame && enabled()))
       visitors.update(time, Boolean(frame && enabled()))
       if(disposed||!xr||!frame||xr.attaching||xr.cancelled||xr.ended||xr.session.visibilityState!=='visible'){companion.update(time,null,false);exploration.pause();bark.pause();return}
       const reference=xr.renderer.xr.getReferenceSpace()
@@ -71,15 +69,15 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, audioF
       stationary:true,ownsAudio:true,customUI:true,
       onEnter(state){
         unbind();xr=state;placed=false;exploration.bind(state);bark.activate();companion.load();selector.bind(state.interaction,enabled)
-        onVisibility=()=>{if(state.session.visibilityState!=='visible'){music.pause();bark.pause();exploration.pause()}}
+        onVisibility=()=>{if(state.session.visibilityState!=='visible'){reality.pause();bark.pause();exploration.pause()}}
         state.session.addEventListener('visibilitychange',onVisibility)
       },
-      onRequestExit(){music.release();selector.unbind();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');placed=false},
+      onRequestExit(){music.release();reality.reset();selector.unbind();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');placed=false},
       onExit:unbind,
       suspend:unbind,
       dispose(){
         if(disposed)return
-        disposed=true;unbind();selection.dispose();music.dispose();visitors.dispose();companion.dispose();bark.dispose();environment.dispose()
+        disposed=true;unbind();reality.dispose();music.dispose();visitors.dispose();companion.dispose();bark.dispose();environment.dispose()
         // Shared createWorldLifecycle disposes all remaining scene graphics exactly once.
       },
     },

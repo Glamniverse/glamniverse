@@ -39,7 +39,7 @@ function harness(){
 test('two immutable prototype songs reference valid environment; verified Neon Therapy audio and no lyrics',()=>{
   assert.equal(SONGS.length,2)
   assert.equal(new Set(SONGS.map(s=>s.id)).size,2)
-  for(const song of SONGS){assert.ok(ENVIRONMENTS[song.environmentId]);assert.equal(song.audioSrc,song.id==='neon-therapy'?'/neon-therapy.mp3':null);assert.equal(song.lyrics,null);assert.ok(Object.isFrozen(song))}
+  for(const song of SONGS){assert.ok(ENVIRONMENTS[song.environmentId]);assert.equal(song.audioSrc,song.id==='neon-therapy'?'/neon-therapy.mp3':'/audio/sky-loft/daydream.mp3');assert.equal(song.lyrics,null);assert.ok(Object.isFrozen(song))}
 })
 test('selection is validated, idempotent and disabled after disposal',()=>{
   const changes=[];const state=createSelection(song=>changes.push(song.id))
@@ -50,7 +50,7 @@ test('selection is validated, idempotent and disabled after disposal',()=>{
 test('one panorama reused across repeated selections; no duplicate texture requests',()=>{
   const h=harness();h.enter()
   for(let i=0;i<30;i++)h.registered[i%2].select()
-  assert.equal(h.loader.requests.length,1);assert.equal(h.game.getDebugState().registeredTargets,4)
+  assert.equal(h.loader.requests.length,2);assert.equal(h.game.getDebugState().registeredTargets,4)
   h.game.xrHooks.dispose();assert.equal(h.registered.length,0)
 })
 test('selector targets ray-hit/miss, hover restoration and selection state',()=>{
@@ -116,7 +116,7 @@ test('geometry budget is bounded; no transparent materials, shadows or frame ani
       assert.equal(o.material.transparent,false);if(o.material.map)textures.add(o.material.map)}
     if(o.isLight){lights++;assert.ok(!o.castShadow)}
   })
-  assert.ok(calls<=13);assert.ok(triangles<3000);assert.equal(textures.size,6);assert.equal(lights,2)
+  assert.ok(calls<=15);assert.ok(triangles<5000);assert.equal(textures.size,6);assert.equal(lights,2)
   console.log('Sky Loft static budget', {calls,triangles,textures:textures.size+1,lights})
   assert.ok(CONFIG.selectorDistance<5);h.game.xrHooks.dispose()
 })
@@ -165,7 +165,7 @@ test('audio switches on a single element, missing song stops previous, clock is 
   assert.equal(media.src,'/neon-therapy.mp3');assert.equal(media.paused,false)
   media.currentTime=12.4;assert.equal(audio.getClock().seconds,12.4)
   audio.select(SONGS[0]);assert.equal(media.plays,1)
-  audio.select(SONGS[1]);assert.equal(media.paused,true);assert.equal(media.src,'')
+  audio.select({...SONGS[1],audioSrc:null});assert.equal(media.paused,true);assert.equal(media.src,'')
   assert.equal(audio.getClock().status,'unavailable');assert.match(messages.at(-1),/not available/)
   audio.select(SONGS[0]);await Promise.resolve();assert.equal(media.plays,2)
   audio.release();assert.equal(media.paused,true);assert.equal(media.src,'')
@@ -178,7 +178,7 @@ test('audio blocked playback, retry, late promises and disposal fail safely',asy
   assert.equal(audio.getClock().status,'error');assert.equal(media.paused,true)
   let resolve
   media.play=()=>new Promise(r=>resolve=r)
-  audio.select(SONGS[0]);audio.select(SONGS[1]);resolve();await Promise.resolve()
+  audio.select(SONGS[0]);audio.select({...SONGS[1],audioSrc:null});resolve();await Promise.resolve()
   assert.equal(audio.getClock().status,'unavailable')
   audio.select(SONGS[0]);audio.dispose();resolve();await Promise.resolve()
   assert.equal(media.src,'');assert.equal(audio.getClock().playing,false)

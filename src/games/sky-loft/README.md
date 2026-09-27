@@ -1,10 +1,10 @@
-# Sky Loft M2 — Living Universe (Preview only)
+# Sky Loft M3 — Reality Engine (Preview only)
 
 ## Stable foundation
 Uses the existing shared renderer, XR controller registry, capability warning, safe exit
 and resource disposer. Loft/sofa geometry and first-pose placement remain M1.
 Virtual floor remains 1.6m below initial headset in local reference space: not a real floor
-or guardian estimate. No locomotion, snap turning, collisions, scoring, or lyrics.
+or guardian estimate. Optional bounded exploration remains M2.2; no scoring or lyrics.
 
 ## Exterior
 Dedicated source copied unchanged from Downloads/neon-city-loft.png to
@@ -18,16 +18,17 @@ One sRGB unlit inward sphere, linear filtering, no mipmaps, ~6MiB decoded RGBA.
 Environment definitions retain panorama/yaw/lighting/accent and visitor-profile hooks.
 
 ## Music
-Neon Therapy reuses /neon-therapy.mp3 without copying. No Daydream file found.
-Daydream is selectable and shows Audio not available yet; selecting it stops Neon Therapy.
-A single private HTMLAudioElement prevents overlap. Selection starts/resumes in the
-controller gesture. Switching stops/unloads old audio before loading new. No crossfade.
-Errors/blocked playback show retry copy; late promises cannot change current selection.
-Headset menu pauses; reselect to resume. Back/system exit releases the media source.
-Re-entry waits for selection. No autoplay on entry. Same playing selection does not restart.
-getPlaybackClock() exposes songId, seconds, duration, playing and status from media time.
-Future lyrics can use that clock; there is no lyric subsystem or per-frame audio polling.
-
+Neon Therapy reuses /neon-therapy.mp3 unchanged. Daydream uses the new
+/audio/sky-loft/daydream.mp3. One private HTMLAudioElement prevents overlap.
+During a reality change its volume fades out, source switches at the dark midpoint,
+then fades in. Daydream-first selection silently primes this same element in the
+controller gesture and rewinds at midpoint; no second player/context.
+Errors/blocked playback show retry copy. Headset menu pauses music and transition;
+explicit song selection resumes. Exit releases media, cancels pending transitions.
+getPlaybackClock() retains songId, seconds, duration, playing, status from media time.
+Silent first-selection priming may briefly advance the clock before midpoint rewind;
+future lyrics must gate on the engine's activeReality/realityTransition state.
+No lyrics, beat analysis or audio-analysis polling implemented.
 ## Visitors
 visitors.js: two pooled luminous swept-wing mantas, opaque body plus neon outline each.
 Shared shell/line geometry/materials, no new textures/lights.
@@ -52,7 +53,7 @@ Two existing lights only; no shadows/postprocessing. Render counts depend on vie
 ## Quest check
 Preview > Glamniverse VR Experiences > Sky Loft M2 > ENTER VR.
 Inspect city all around including seam/poles and seated floor impression. Select Neon
-Therapy, Daydream, Neon Therapy rapidly; confirm one song, unavailable message and retry.
+Therapy, Daydream, Neon Therapy rapidly; confirm one song and the correct exterior/species.
 Watch at least 90 seconds for both manta paths, nearby silhouette, depth and comfort.
 Try headset menu/reselect, controller reconnect, Back, system exit/re-entry and reopening.
 Compare frame stability with M1. No new Quest validation is claimed.
@@ -124,3 +125,51 @@ One added selector panel: +1 draw, +2 triangles, +1 canvas texture. Upper estima
 22 draws/eye, 25,652 triangles, seven existing/UI image textures plus one skeleton
 texture, same two lights. Movement uses a handful of rectangle tests per moving frame;
 no physics/raycast navigation, new lights or dependencies. Bark is silent until supplied.
+
+## M3: declarative realities and transitions
+config.js SONGS/REALITIES map song id/title/audio/environment/theme/lyrics:null.
+ENVIRONMENTS maps panorama/yaw/background/ambient light/visitor species.
+Add a future song + environment definition to extend the selector automatically.
+Add a species factory to reality-visitors.js only if a new creature family is needed.
+reality.js alone coordinates transitions; it never receives the Bichon or XR rig.
+
+Transition is 2.4 seconds of visible animation after the panorama is ready:
+1.2s smooth fade of the single opaque exterior sphere and old visitor materials,
+swap at darkness, 1.2s fade up. Interior stays visible; no camera fade, black screen,
+transparent overlapping spheres, extra lights or postprocessing.
+Ambient light and loft accent interpolate throughout. Latest rapid selection queues
+behind an in-flight change. Re-selecting an active playing reality is idempotent.
+Images are requested asynchronously once per visited environment, cached until exit
+disposal; failed requests can retry. No entire-world rebuild or player reposition.
+First texture GPU upload can still briefly cost a frame; evaluate on Quest.
+
+Daydream originals copied unchanged:
+C:/Users/Ani/Downloads/daydream.png -> public/images/sky-loft/daydream.png
+PNG 1774x887, exactly 2:1, 2,592,098 bytes.
+SHA256 74EF11DC788195AAD56035DA5807BE54D5C554B71C0C04F6962381DEC1469520
+C:/Users/Ani/Downloads/daydream.mp3 -> public/audio/sky-loft/daydream.mp3
+5,770,229 bytes, Windows media duration 244.56s; title Daydream / artist glamniverse.
+Source basename is daydream, not Daydream_V4(2); no track substitution.
+SHA256 5688D683327FC56C7596EBE137556BD3099F1D02629D8E7EE8D26A2D371C3055
+No image upscale/crop/recompression. Daydream yaw PI/2 places image centre forward.
+Generated furniture/terrace below horizon is part of distant imagery, not walkable
+geometry. Left/right content is not perfectly matched; poles can pinch; native
+resolution limits sharpness. Usable prototype artwork, not certified seamless.
+
+Daydream ambient #e5c5e9 at 1.55, accent #edb4df. Existing directional light untouched.
+Neon ambient #afa0da at 1.7, accent #66d9ef, yaw 0 and original visitors unchanged.
+Butterflies: four pooled individuals, two instanced draws (8 wing halves + 4 bodies).
+Each wing has two curved lobes; vertex color inner gold/outer dark accents, per-instance
+blue/lilac/pink/turquoise. Opaque double-sided wings, no textures, simple body.
+27s curved exterior passes in a 32s cycle; offsets 0/5/10/15s, gentle bob/bank and
+hinged flapping. No collisions or player targets. Paths tested outside entire terrace.
+Only active species updates; resources shared and released by existing scene disposer.
+
+Conservative unculled scene estimate (excluding existing controllers/rays):
+Neon: 22 draws / 25,652 triangles + existing outline lines (unchanged).
+Daydream: 20 draws / 26,236 triangles, four butterflies total 616 triangles.
+Transition peak <=22 draws / 26,236 triangles: one sphere/species, no doubled scenery.
+8 cached image/UI textures after both realities visited, plus existing skeleton texture.
+Second 1774x887 RGBA panorama adds ~6.0 MiB GPU texture memory; both ~12.0 MiB,
+no mipmaps. HTML media playback avoids decoding both complete tracks into WebAudio.
+Same 2 lights, same Bichon mixer. No new dependencies. Hardware frame timing unmeasured.

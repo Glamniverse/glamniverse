@@ -46,5 +46,6 @@ export function createLoft(parent) {
   })
   const light = new THREE.DirectionalLight(0xffe6f4, 2.4)
   light.position.set(-4,7,-3); parent.add(light)
-  return { setTheme(theme) { accent.color.set(theme.accent) }, instances: batches.reduce((n,b)=>n+b.length,0) }
+  const fromColor=new THREE.Color(),toColor=new THREE.Color()
+  return { blendTheme(from,to,t) { fromColor.set(from.accent);toColor.set(to.accent);accent.color.lerpColors(fromColor,toColor,t) }, setTheme(theme) { accent.color.set(theme.accent) }, instances: batches.reduce((n,b)=>n+b.length,0) }
 }
