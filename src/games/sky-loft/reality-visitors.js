@@ -1,10 +1,11 @@
 import * as THREE from 'three'
 import { createVisitors } from './visitors.js'
 import { createButterflies } from './butterflies.js'
+import { createJellyfish } from './jellyfish.js'
 
 // Species registry, deliberately separate from persistent companion and scene lifecycle.
 export function createRealityVisitors(parent){
-  const definitions={'neon-mantas':createVisitors,butterflies:createButterflies},systems={}
+  const definitions={'neon-mantas':createVisitors,butterflies:createButterflies,jellyfish:createJellyfish},systems={}
   for(const [id,create] of Object.entries(definitions)){
     const group=new THREE.Group();parent.add(group)
     const system=create(group),materials=new Map()
@@ -34,9 +35,12 @@ export function createRealityVisitors(parent){
     setVisibility,
     update(time,enabled){if(!disposed&&selected)systems[selected].system.update(time,enabled)},
     reset(){for(const s of Object.values(systems))s.system.reset()},
-    stats:()=>({visitorSpecies:selected,visitorPool:selected==='butterflies'?4:2,
-      activeVisitors:selected==='butterflies'?systems.butterflies.system.stats().activeButterflies:systems['neon-mantas'].system.stats().activeVisitors,
-      ...systems.butterflies.system.stats()}),
+    stats:()=>{
+      const stats=selected?systems[selected].system.stats():{}
+      return {visitorSpecies:selected,visitorPool:stats.visitorPool??stats.butterflyPool??stats.jellyfishPool??0,
+        activeVisitors:stats.activeVisitors??stats.activeButterflies??stats.activeJellyfish??0,
+        ...systems.butterflies.system.stats(),...systems.jellyfish.system.stats()}
+    },
     dispose(){if(disposed)return;disposed=true;for(const s of Object.values(systems)){s.system.dispose();s.group.visible=false}},
   }
 }

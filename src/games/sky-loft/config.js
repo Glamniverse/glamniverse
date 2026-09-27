@@ -6,6 +6,9 @@ export const CONFIG = Object.freeze({
 
 // Reality definitions own assets/themes; persistent room, dog and XR rig do not.
 export const ENVIRONMENTS = Object.freeze({
+  'paradise-sky': Object.freeze({ panorama:'/images/sky-loft/paradise.png',
+    yaw:Math.PI/2, radius:180, background:0x232032,
+    ambient:0xe4cddd, ambientIntensity:1.55, visitors:'jellyfish' }),
   'daydream-sky': Object.freeze({ panorama:'/images/sky-loft/daydream.png',
     yaw:Math.PI/2, radius:180, background:0x242039,
     ambient:0xe5c5e9, ambientIntensity:1.55, visitors:'butterflies' }),
@@ -22,6 +25,8 @@ export const SONGS = Object.freeze([
     environmentId: 'sky-city', theme: Object.freeze({ accent: '#66d9ef' }), lyrics: null }),
   Object.freeze({ id: 'daydream', title: 'Daydream', audioSrc: '/audio/sky-loft/daydream.mp3',
     environmentId: 'daydream-sky', theme: Object.freeze({ accent: '#edb4df' }), lyrics: null }),
+  Object.freeze({ id:'paradise', title:'Paradise', audioSrc:'/audio/sky-loft/paradise.mp3',
+    environmentId:'paradise-sky', theme:Object.freeze({accent:'#f2c2a6'}), lyrics:null }),
 ])
 
 export const REALITIES = Object.freeze(Object.fromEntries(SONGS.map(song=>[song.id,song])))

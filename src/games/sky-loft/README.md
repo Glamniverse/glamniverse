@@ -1,4 +1,4 @@
-# Sky Loft M3 — Reality Engine (Preview only)
+# Sky Loft M3.1 — Paradise (Preview only)
 
 ## Stable foundation
 Uses the existing shared renderer, XR controller registry, capability warning, safe exit
@@ -173,3 +173,41 @@ Transition peak <=22 draws / 26,236 triangles: one sphere/species, no doubled sc
 Second 1774x887 RGBA panorama adds ~6.0 MiB GPU texture memory; both ~12.0 MiB,
 no mipmaps. HTML media playback avoids decoding both complete tracks into WebAudio.
 Same 2 lights, same Bichon mixer. No new dependencies. Hardware frame timing unmeasured.
+
+## M3.1 Paradise — incremental third reality
+Approved M3 coordinator/audio/transition, Neon and Daydream species, Bichon and
+locomotion code are unchanged. SONGS + ENVIRONMENTS add Paradise; species registry
+adds jellyfish. Selector keeps the same button dimensions, centred at x -0.86/0/0.86m,
+at the existing 2.4m distance. Back/movement behavior is unchanged.
+
+Sources copied byte-for-byte, originals preserved:
+C:/Users/Ani/Downloads/paradise.png -> public/images/sky-loft/paradise.png
+PNG 1774x887 (2:1), 2,801,150 bytes.
+SHA256 4DD196F80910DACE9A966C686EBFA335FF07AE9BE1DCDAF2F2AB6E0D75EE17B7
+C:/Users/Ani/Downloads/paradise.mp3 -> public/audio/sky-loft/paradise.mp3
+6,981,822 bytes; Windows media duration 299.472s; no title/artist tags.
+Identification is the exact user-specified Paradise basename + valid MP3 media metadata.
+SHA256 7A1EB524C70B85D02E1BC3E6189680B658263296B1FDA05B077281C0AA5FD921
+
+Panorama yaw PI/2 puts its centre/open ocean forward; source resolution retained.
+Painted terrace/furniture and jellyfish remain distant imagery, not floor or extra models.
+Not certified seamless; poles may pinch and edges differ. No crop/upscale/reconstruction.
+Warm neutral pink-lilac ambient #e4cddd intensity 1.55; accent #f2c2a6.
+Same directional light. Bichon material is untouched.
+
+12 pooled jellyfish: three InstancedMesh draws, one shared dome, rim and merged
+six-tentacle skirt geometry. Opaque unlit vertex-colored bell, cyan luminous rim,
+blue ribbons; no textures/alpha/shaders/lights added. Total 5,856 visitor triangles.
+Slow sinusoidal current, gentle bob/rotation, phase-varied bell pulse and skirt sway;
+different anchor depths/scales, three nearer specimens. All drift envelopes tested
+outside the entire 14x12m floor with clearance; no player interaction.
+Only active species updates; existing fade dims species materials during the 2.4s
+transition. Switching never accumulates geometry/instances.
+
+Estimates excluding shared XR controllers/rays:
+Neon 23 draws / 25,654 triangles; Daydream 21 draws / 26,238 triangles;
+Paradise 22 draws / 31,478 triangles. Transition upper bound 23 draws / 31,478 triangles,
+one environment/species at a time. The third selector panel adds one draw/two triangles.
+All three panoramas cached: ~18.0 MiB RGBA without mipmaps. 10 image/UI textures after
+all realities visited, plus existing skeleton texture; 2 lights, no new dependencies.
+Actual GPU frame timing and jellyfish visibility remain for physical Quest testing.

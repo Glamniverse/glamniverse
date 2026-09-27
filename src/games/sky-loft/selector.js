@@ -19,7 +19,7 @@ export function createSelector(parent, onSelect, back, onMovement=()=>{}) {
   group.add(heading.mesh,status.mesh,exit.mesh,movement.mesh)
   const buttons = SONGS.map((song,i) => {
     const panel = makePanel(0.79,0.29,512,192)
-    panel.mesh.position.set((i-0.5)*0.86,-0.09,-CONFIG.selectorDistance)
+    panel.mesh.position.set((i-(SONGS.length-1)/2)*0.86,-0.09,-CONFIG.selectorDistance)
     group.add(panel.mesh); return { song,panel,hover:false }
   })
   let selected = SONGS[0].id, unregister = [], bound = false, playback = 'Select a song to play'
@@ -51,6 +51,6 @@ export function createSelector(parent, onSelect, back, onMovement=()=>{}) {
       unregister.splice(0).forEach(remove=>remove());bound=false
       for(const b of buttons) {b.hover=false;b.panel.mesh.scale.setScalar(1);b.panel.mesh.material.color.setHex(0xffffff)}
     },
-    stats:()=>({registeredTargets:bound?4:0,selected}),
+    stats:()=>({registeredTargets:bound?SONGS.length+2:0,selected}),
   }
 }

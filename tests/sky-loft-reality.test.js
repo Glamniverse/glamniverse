@@ -36,7 +36,7 @@ function setup(){
   return {root,images,environment,visitors,media,music,engine,messages,advance}
 }
 test('declarative realities map exact preserved Neon and new Daydream assets/species, no lyrics',()=>{
-  assert.equal(Object.keys(REALITIES).length,2)
+  assert.equal(Object.keys(REALITIES).length,3)
   assert.equal(REALITIES['neon-therapy'].audioSrc,'/neon-therapy.mp3')
   assert.equal(ENVIRONMENTS[REALITIES['neon-therapy'].environmentId].panorama,'/images/sky-loft/neon-city-loft.png')
   assert.equal(ENVIRONMENTS[REALITIES['neon-therapy'].environmentId].visitors,'neon-mantas')
@@ -141,17 +141,17 @@ test('real loaded Bichon and locomotion persist through switches, XR reset/re-en
   const frame={getViewerPose:()=>({transform:{position:{x:0,y:0,z:0},orientation:{x:0,y:0,z:0,w:1}}})}
   let time=0;function tick(seconds){for(let i=0;i<seconds*50;i++){time+=20;game.update(time,frame)}}
   game.xrHooks.onEnter(state);tick(.1);images.complete()
-  registered[3].select();tick(.1);left.source.gamepad.axes[2]=1;tick(1);left.source.gamepad.axes[2]=0;tick(.1)
+  registered[4].select();tick(.1);left.source.gamepad.axes[2]=1;tick(1);left.source.gamepad.axes[2]=0;tick(.1)
   const position=origin.position.clone(),rotation=origin.quaternion.clone(),objects=[]
   game.scene.traverse(o=>objects.push(o))
-  for(let i=0;i<8;i++){
-    registered[i%2].select();images.complete();tick(3);await Promise.resolve()
+  for(let i=0;i<9;i++){
+    registered[i%3].select();images.complete();tick(3);await Promise.resolve()
     assert.deepEqual(origin.position,position);assert.ok(origin.quaternion.equals(rotation))
     assert.equal(game.getDebugState().movement,'slow');assert.equal(game.getDebugState().companionCount,1)
   }
   const after=[];game.scene.traverse(o=>after.push(o));assert.deepEqual(after,objects)
-  assert.equal(dogLoads,1);assert.equal(audioCreated,1);assert.equal(images.requests.length,2)
-  assert.equal(game.getDebugState().activeReality,'daydream')
+  assert.equal(dogLoads,1);assert.equal(audioCreated,1);assert.equal(images.requests.length,3)
+  assert.equal(game.getDebugState().activeReality,'paradise')
   // Continuing to push reaches, but never crosses, the original X boundary.
   left.source.gamepad.axes[2]=1;tick(30);assert.ok(origin.position.x<=6.35)
   game.xrHooks.onExit();assert.equal(media.src,'');assert.equal(registered.length,0)
@@ -166,4 +166,56 @@ test('Daydream-first selection primes silently in user gesture, then rewinds at 
   assert.equal(h.media.volume,0);h.advance(.6)
   assert.equal(h.media.currentTime,0);h.advance(2);assert.equal(h.media.volume,.65)
   h.music.dispose();h.environment.dispose();h.visitors.dispose()
+})
+
+import {JELLYFISH,createJellyfish,jellyfishPosition} from '../src/games/sky-loft/jellyfish.js'
+test('Paradise assets, theme, lyric placeholder and visitor mapping',()=>{
+  const r=REALITIES.paradise,e=ENVIRONMENTS[r.environmentId]
+  assert.equal(r.audioSrc,'/audio/sky-loft/paradise.mp3');assert.equal(e.panorama,'/images/sky-loft/paradise.png')
+  assert.equal(e.visitors,'jellyfish');assert.equal(r.lyrics,null);assert.equal(e.yaw,Math.PI/2)
+  const image=readFileSync(new URL('../public'+e.panorama,import.meta.url))
+  assert.equal(image.readUInt32BE(16),1774);assert.equal(image.readUInt32BE(20),887)
+  assert.equal(createHash('sha256').update(image).digest('hex'),'4dd196f80910dace9a966c686ebfa335ff07ae9be1dcdaF2f2ab6e0d75ee17b7'.toLowerCase())
+  assert.equal(readFileSync(new URL('../public'+r.audioSrc,import.meta.url)).length,6981822)
+})
+test('all directed reality pairs, Paradise reselection, one track and mutually exclusive species',async()=>{
+  const h=setup();h.images.complete()
+  for(const from of Object.keys(REALITIES))for(const to of Object.keys(REALITIES)){
+    for(const id of [from,to]){
+      h.engine.select(id);h.images.complete();h.advance(3);await Promise.resolve()
+      assert.equal(h.engine.stats().activeReality,id)
+      assert.equal(h.visitors.stats().visitorSpecies,ENVIRONMENTS[REALITIES[id].environmentId].visitors)
+      assert.equal(h.media.src,REALITIES[id].audioSrc)
+      assert.equal(h.music.getClock().songId,id)
+      assert.ok(h.visitors.stats().activeVisitors<=12)
+      if(id!=='paradise')assert.equal(h.visitors.stats().activeJellyfish,0)
+      if(id!=='daydream')assert.equal(h.visitors.stats().activeButterflies,0)
+    }
+  }
+  h.engine.select('paradise');h.advance(3);await Promise.resolve()
+  const plays=h.media.plays;h.media.currentTime=42.5;h.engine.select('paradise')
+  assert.equal(h.media.plays,plays);assert.equal(h.music.getClock().seconds,42.5)
+  const objects=h.root.children.length
+  for(let i=0;i<30;i++){h.engine.select(Object.keys(REALITIES)[i%3]);h.advance(3)}
+  assert.equal(h.root.children.length,objects);assert.equal(h.images.requests.length,3)
+  h.engine.pause();assert.equal(h.media.paused,true);h.engine.select('paradise');h.advance(3)
+  h.music.release();h.engine.reset();assert.equal(h.media.src,'')
+  h.music.dispose();h.environment.dispose();h.visitors.dispose()
+})
+test('twelve jellyfish use three opaque instanced draws, bounded exterior current and clean reset',()=>{
+  const root=new THREE.Group(),j=createJellyfish(root),group=root.children[0],p=new THREE.Vector3()
+  assert.equal(group.children.length,3);let triangles=0
+  for(const m of group.children){assert.ok(m.isInstancedMesh);assert.equal(m.instanceMatrix.count,12);assert.equal(m.material.transparent,false);assert.equal(m.material.map,null);triangles+=m.geometry.index.count/3*12}
+  assert.ok(triangles<6500);console.log('Paradise jellyfish budget',{draws:3,triangles,count:12})
+  j.update(0,true);const before=group.children[0].instanceMatrix.array.slice()
+  j.update(50,true);assert.notDeepEqual(before,group.children[0].instanceMatrix.array)
+  for(let t=0;t<300;t+=.5)for(let i=0;i<12;i++){
+    jellyfishPosition(t,i,p)
+    assert.ok(Math.abs(p.x)>CONFIG.width/2+1.5||Math.abs(p.z)>CONFIG.depth/2+1.5)
+    assert.ok(p.y>4)
+  }
+  assert.equal(j.stats().activeJellyfish,12)
+  j.update(100,false);assert.equal(j.stats().activeJellyfish,0)
+  j.reset();j.update(200,true);assert.equal(root.children.length,1)
+  j.dispose();j.update(300,true);assert.equal(j.stats().activeJellyfish,0);assert.equal(group.visible,false)
 })

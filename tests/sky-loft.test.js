@@ -37,9 +37,9 @@ function harness(){
     tick(time=0){game.update(time,frame)},move(p){position=p},enter(){game.xrHooks.onEnter(state);game.update(0,frame)}}
 }
 test('two immutable prototype songs reference valid environment; verified Neon Therapy audio and no lyrics',()=>{
-  assert.equal(SONGS.length,2)
-  assert.equal(new Set(SONGS.map(s=>s.id)).size,2)
-  for(const song of SONGS){assert.ok(ENVIRONMENTS[song.environmentId]);assert.equal(song.audioSrc,song.id==='neon-therapy'?'/neon-therapy.mp3':'/audio/sky-loft/daydream.mp3');assert.equal(song.lyrics,null);assert.ok(Object.isFrozen(song))}
+  assert.equal(SONGS.length,3)
+  assert.equal(new Set(SONGS.map(s=>s.id)).size,3)
+  for(const song of SONGS){assert.ok(ENVIRONMENTS[song.environmentId]);assert.equal(song.audioSrc,song.id==='neon-therapy'?'/neon-therapy.mp3':'/audio/sky-loft/'+song.id+'.mp3');assert.equal(song.lyrics,null);assert.ok(Object.isFrozen(song))}
 })
 test('selection is validated, idempotent and disabled after disposal',()=>{
   const changes=[];const state=createSelection(song=>changes.push(song.id))
@@ -50,15 +50,16 @@ test('selection is validated, idempotent and disabled after disposal',()=>{
 test('one panorama reused across repeated selections; no duplicate texture requests',()=>{
   const h=harness();h.enter()
   for(let i=0;i<30;i++)h.registered[i%2].select()
-  assert.equal(h.loader.requests.length,2);assert.equal(h.game.getDebugState().registeredTargets,4)
+  assert.equal(h.loader.requests.length,2);assert.equal(h.game.getDebugState().registeredTargets,5)
   h.game.xrHooks.dispose();assert.equal(h.registered.length,0)
 })
 test('selector targets ray-hit/miss, hover restoration and selection state',()=>{
   const h=harness();h.enter();h.game.scene.updateMatrixWorld(true)
   const eye=new THREE.Vector3(0,1.6,0)
   const target=h.registered[1],center=target.object.getWorldPosition(new THREE.Vector3())
-  const ray=new THREE.Raycaster(eye,center.clone().sub(eye).normalize(),0,5)
+  const ray=new THREE.Raycaster(eye,center.clone().add(new THREE.Vector3(.02,0,0)).sub(eye).normalize(),0,5)
   assert.equal(ray.intersectObjects(h.registered.map(e=>e.object)).length,1)
+  for(let i=0;i<SONGS.length;i++){const p=h.registered[i].object.getWorldPosition(new THREE.Vector3());p.x+=.02;ray.ray.direction.copy(p.sub(eye).normalize());assert.equal(ray.intersectObjects(h.registered.map(e=>e.object)).length,1);h.registered[i].select();assert.equal(h.game.getDebugState().selected,SONGS[i].id)}
   ray.ray.direction.set(0,1,0);assert.equal(ray.intersectObjects(h.registered.map(e=>e.object)).length,0)
   target.options.onHover(true);assert.equal(target.object.scale.x,1.035)
   target.select();assert.equal(h.game.getDebugState().selected,'daydream')
@@ -85,8 +86,8 @@ test('invalid pose / pending XR / hidden session cannot select; recovery is clea
 })
 test('Back, interrupted exit, repeated sessions and idempotent disposal unregister all targets',()=>{
   const h=harness()
-  for(let i=0;i<10;i++){h.enter();h.game.xrHooks.onEnter(h.state);h.tick();assert.equal(h.registered.length,4)
-    h.registered[2].select();h.game.xrHooks.onRequestExit();assert.equal(h.registered.length,0)
+  for(let i=0;i<10;i++){h.enter();h.game.xrHooks.onEnter(h.state);h.tick();assert.equal(h.registered.length,5)
+    h.registered[3].select();h.game.xrHooks.onRequestExit();assert.equal(h.registered.length,0)
     h.game.xrHooks.onExit();assert.equal(h.game.getDebugState().placed,false)}
   assert.equal(h.backs(),10)
   h.enter();h.game.xrHooks.suspend();assert.equal(h.registered.length,0)
@@ -116,7 +117,7 @@ test('geometry budget is bounded; no transparent materials, shadows or frame ani
       assert.equal(o.material.transparent,false);if(o.material.map)textures.add(o.material.map)}
     if(o.isLight){lights++;assert.ok(!o.castShadow)}
   })
-  assert.ok(calls<=15);assert.ok(triangles<5000);assert.equal(textures.size,6);assert.equal(lights,2)
+  assert.ok(calls<=19);assert.ok(triangles<9000);assert.equal(textures.size,7);assert.equal(lights,2)
   console.log('Sky Loft static budget', {calls,triangles,textures:textures.size+1,lights})
   assert.ok(CONFIG.selectorDistance<5);h.game.xrHooks.dispose()
 })
@@ -220,8 +221,8 @@ test('exploration selector preserves song rays and resets movement/rig on XR re-
   const h=harness()
   const left={connected:true,controller:{visible:true},source:{handedness:'left',gamepad:{mapping:'xr-standard',axes:[0,0,0,0]}}}
   h.state.interaction.controllers=[left];h.enter()
-  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,4)
-  h.registered[3].select();assert.equal(h.game.getDebugState().movement,'slow');h.tick(16)
+  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,5)
+  h.registered[4].select();assert.equal(h.game.getDebugState().movement,'slow');h.tick(16)
   left.source.gamepad.axes[2]=1
   for(let i=2;i<65;i++)h.tick(i*16)
   assert.ok(h.state.origin.position.x>.3);assert.equal(h.state.origin.position.y,1.6)
@@ -230,6 +231,6 @@ test('exploration selector preserves song rays and resets movement/rig on XR re-
   const x=h.state.origin.position.x;h.tick(2000);assert.equal(h.state.origin.position.x,x)
   h.state.session.visibilityState='visible';h.tick(2016);h.tick(2032);assert.equal(h.state.origin.position.x,x)
   h.game.xrHooks.onExit();assert.equal(h.state.origin.position.x,0);h.enter()
-  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,4)
+  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,5)
   h.game.xrHooks.dispose();assert.equal(h.registered.length,0)
 })
