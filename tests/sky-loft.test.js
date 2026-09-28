@@ -234,3 +234,39 @@ test('exploration selector preserves song rays and resets movement/rig on XR re-
   assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,5)
   h.game.xrHooks.dispose();assert.equal(h.registered.length,0)
 })
+
+test('raised selector clears actual tabletop; all five controls ray-hit and Back retains behavior',()=>{
+  const h=harness();h.enter();h.game.scene.updateMatrixWorld(true)
+  const solids=[],matrix=new THREE.Matrix4(),world=new THREE.Matrix4(),box=new THREE.Box3()
+  let tableTop=null
+  h.game.scene.traverse(o=>{
+    if(!o.isInstancedMesh)return
+    solids.push(o)
+    for(let i=0;i<o.count;i++){
+      o.getMatrixAt(i,matrix);world.multiplyMatrices(o.matrixWorld,matrix)
+      const centre=new THREE.Vector3().setFromMatrixPosition(world)
+      if(Math.abs(centre.x)<.001&&Math.abs(centre.y-.55)<.001&&Math.abs(centre.z+2.6)<.001){
+        o.geometry.computeBoundingBox();box.copy(o.geometry.boundingBox).applyMatrix4(world);tableTop=box.max.y
+      }
+    }
+  })
+  assert.ok(tableTop!==null)
+  const back=h.registered[3].object
+  const bounds=new THREE.Box3().setFromObject(back)
+  assert.ok(bounds.min.y-tableTop>=.169)
+  assert.ok(Math.abs(back.getWorldPosition(new THREE.Vector3()).y-.84)<.0001)
+  const ray=new THREE.Raycaster();ray.far=5
+  for(const height of [.9,1.6,2])for(const x of [-.3,0,.3]){
+    ray.ray.origin.set(x,height,0)
+    for(const entry of h.registered){
+      const point=entry.object.getWorldPosition(new THREE.Vector3());point.x+=.02
+      ray.ray.direction.copy(point.sub(ray.ray.origin).normalize())
+      const hits=ray.intersectObjects([...solids,...h.registered.map(e=>e.object)],false)
+      assert.equal(hits[0]?.object,entry.object)
+    }
+  }
+  for(let i=0;i<3;i++){h.registered[i].select();assert.equal(h.game.getDebugState().selected,SONGS[i].id)}
+  h.registered[4].select();assert.equal(h.game.getDebugState().movement,'slow')
+  h.registered[3].select();assert.equal(h.backs(),1)
+  h.game.xrHooks.dispose()
+})

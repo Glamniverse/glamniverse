@@ -4,6 +4,7 @@ import { SONGS, CONFIG } from './config.js'
 
 export function createSelector(parent, onSelect, back, onMovement=()=>{}) {
   const group = new THREE.Group(); parent.add(group)
+  group.position.y = 0.30 // Keep the entire BACK panel above the 0.585m selector tabletop.
   const heading = makePanel(1.65,0.3,1024,192)
   heading.draw(['GLAMNIVERSE', 'CHOOSE YOUR REALITY'], '#ad8ec8')
   heading.mesh.position.set(0,0.3,-CONFIG.selectorDistance)
