@@ -30,7 +30,7 @@ test('supplied Paradise data: 76 valid events, all 20 presets, bounded chronolog
   assert.equal(new Set(data.events.map(e=>e.text)).size,37)
   for(const text of ['Ocean sunsets','Neon lights','Lost between the waves and sky','The world disappears','Paradise'])assert.ok(data.events.some(e=>e.text===text))
   // Immutable supplied prototype: editing timing is intentional and should update this provenance checksum.
-  assert.equal(createHash('sha256').update(bytes).digest('hex'),'3ab204374acacaac9388d8922102555538288a0d92aa6d04abfa16f20b39f323')
+  assert.equal(createHash('sha256').update(bytes.toString('utf8').replaceAll('\r\n','\n')).digest('hex'),'3ab204374acacaac9388d8922102555538288a0d92aa6d04abfa16f20b39f323')
   for(const change of [{start:-1},{end:400},{end:52},{preset:'UNKNOWN'}])assert.throws(()=>validateLyricData({...data,events:[{...data.events[0],...change}]},'paradise'))
 })
 test('timeline exact boundaries, overlapping phrases and forward/backward seek inspect current intervals only',()=>{
