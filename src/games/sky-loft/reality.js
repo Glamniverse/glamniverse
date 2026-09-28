@@ -50,9 +50,21 @@ export function createRealityEngine({environment,loft,visitors,music,onSelect=()
       loft.blendTheme(tr.from.theme,tr.to.theme,smooth(p))
       if(p>=1){transition=null;environment.setBrightness(1);visitors.setVisibility(1);music.setGain(1);music.refreshStatus()}
     },
+    // Manual Pause freezes only media/lyrics. Selecting a different reality starts its song normally.
+    togglePlayback(){
+      if(disposed)return false
+      if(paused)return this.select(wanted.id) // resume an interrupted transition through its existing path
+      if(transition||wanted!==active)return false
+      if(music.getClock().playing)music.pause()
+      else music.select(active)
+      return true
+    },
     pause(){paused=true;last=null;music.pause()},
     reset,
-    stats:()=>({activeReality:active.id,requestedReality:wanted.id,realityTransition:transition!==null,realityPaused:paused}),
+    stats(out={}){
+      out.activeReality=active.id;out.requestedReality=wanted.id;out.realityTransition=transition!==null;out.realityPaused=paused
+      return out
+    },
     dispose(){disposed=true;transition=null;last=null},
   }
 }

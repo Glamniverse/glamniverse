@@ -211,3 +211,74 @@ one environment/species at a time. The third selector panel adds one draw/two tr
 All three panoramas cached: ~18.0 MiB RGBA without mipmaps. 10 image/UI textures after
 all realities visited, plus existing skeleton texture; 2 lights, no new dependencies.
 Actual GPU frame timing and jellyfish visibility remain for physical Quest testing.
+
+
+## M4: Paradise spatial lyrics (feature branch R&D)
+
+Runtime data: public/data/sky-loft/lyrics/paradise.json, copied byte-for-byte from
+the supplied extracted Paradise package. 76 events, 37 unique phrases, 20 presets.
+Approved TXT wording matches after normalizing curly/straight apostrophes and
+whitespace. No lyric rewrites, transcription or timing regeneration. First event
+53.00s; last expires 280.88s. CapCut timings have roughly one-second precision,
+with supplied editorial splits. Edit event start/end/text/preset in JSON to tune;
+update its provenance checksum test after an intentional edit.
+
+SONGS[id].lyrics is a JSON URL (null for Neon/Daydream). lyric-presets.js defines
+the small preset vocabulary, geometry/fades and four-object cap. lyrics.js loads
+and validates data, builds one 2048x2048 atlas using the browser's generic serif
+font, and maps tight UV crops onto four pooled planes. No font file, dependency,
+DOM overlay, shader effect, timer or per-frame canvas generation. Atlas remains
+cached across Neon/Daydream switches and is disposed with the world; future songs
+with lyrics replace that single cache. Fetch failure is silent/retryable via song
+selection; unavailable lyrics do not affect playback.
+
+Lyrics use active media currentTime, active/requested reality and transition
+state. Motion, rise and opacity also use media time, so Pause freezes everything
+lyric-related. Seeking selects current intervals without replaying past events.
+OFF hides immediately without touching audio; ON restores current intervals.
+Fresh XR entry resets ON. All old lyrics hide on reality selection or exit.
+
+Anchors resolve current headset world position/facing into loft space once per
+event, constrained to the open front hemisphere (within 45 degrees of front) and
+beyond z=-10m. They never follow subsequent head turns. Centre height is at least
+3.8m above the floor; ordinary text is 16-42m distant. HERO_PARADISE is 26m wide
+at 60m with a gentle 0.9m rise; echo is softer/farther. Repeated declarations stack
+vertically during deliberate overlaps. All visual values still need Quest review,
+especially after walking to the back of the loft or looking away from the ocean.
+
+Play/Pause uses the existing single player without rewinding. Selecting another
+reality starts its new song normally, even if the previous song was paused.
+During a normal transition Play/Pause is temporarily unavailable; after headset
+interruption PLAY resumes the existing transition. No whole-world pause: visitors
+and the Bichon keep updating during manual music pause. Ended audio is not a new
+restart feature; normal song reselection behavior remains the existing behavior.
+
+Selector retains group y=+0.30m and Back centre y=0.84m / lower edge 0.755m
+(0.170m above the 0.585m table). Heading/song/status shift up within the panel;
+two utility buttons at local x +/-0.44, y=-0.44, 0.82x0.18m sit above movement.
+Seven targets keep existing indices for songs/Back/movement; controls append.
+
+Additional rendering cost: two utility draws / four triangles / two 768x128
+textures, plus one draw/two triangles per visible lyric (supplied peak two; cap
+four). One 2048x2048 RGBA atlas is 16MiB, approximately 21.3MiB with mipmaps, plus
+CPU canvas backing; UI textures approximately 1MiB with mipmaps. No lights added.
+Paradise estimate: 26 draws / 31,486 triangles at supplied lyric peak; hard cap
+28 draws / 31,490 triangles, excluding controller rays. Transition hides lyrics,
+so its upper bound is 25 draws / 31,482 triangles. Texture count grows by three
+(13 image/UI textures after all realities cached, plus existing skeleton texture).
+
+Quest timing checklist: first verse 0:53; overlapping chorus at 1:36/1:36.9;
+Ocean/Neon at 1:44/1:45.2; hero at 1:49.5, 2:06.5, 3:04.5, 3:20.5, 4:20.5,
+4:37.5; ad-libs 2:20 and 3:30; bridge 3:47-4:06; declarations 3:57/3:58.4.
+No spatial lyrics are authored for Neon or Daydream. No new Production release
+is authorized by this feature branch; only Preview deployment for hardware review.
+
+Browser review found the starting-position selector could occlude horizon lyrics.
+At event creation only, projected bounds now lift an occluded phrase above the
+selector and above a simultaneously live phrase where needed. No furniture/UI
+moves; walking aside can reveal the natural lower horizon anchor. The adjustment
+remains frozen for the lifetime of the phrase. Quest must confirm vertical comfort.
+
+Hero/echo use uppercase as a typography style; source text remains unchanged.
+Overlapping phrases prefer a small lateral separation within the front composition
+before vertical stacking, to avoid requiring upward neck turns for the second line.

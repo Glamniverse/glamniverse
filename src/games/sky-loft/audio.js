@@ -53,9 +53,12 @@ export function createLoftAudio(element, notify = () => {}) {
       if (disposed) return
       generation++; current = null; clear(); setStatus('idle')
     },
-    getClock: () => ({ songId: current?.id ?? null, seconds: element.currentTime || 0,
-      duration: Number.isFinite(element.duration) ? element.duration : null,
-      playing: !disposed && !element.paused && status === 'playing', status }),
+    getClock(out = {}) {
+      out.songId=current?.id ?? null;out.seconds=element.currentTime || 0
+      out.duration=Number.isFinite(element.duration) ? element.duration : null
+      out.playing=!disposed && !element.paused && status==='playing';out.status=status
+      return out
+    },
     dispose() {
       if (disposed) return
       generation++; disposed = true

@@ -26,7 +26,7 @@ export const SONGS = Object.freeze([
   Object.freeze({ id: 'daydream', title: 'Daydream', audioSrc: '/audio/sky-loft/daydream.mp3',
     environmentId: 'daydream-sky', theme: Object.freeze({ accent: '#edb4df' }), lyrics: null }),
   Object.freeze({ id:'paradise', title:'Paradise', audioSrc:'/audio/sky-loft/paradise.mp3',
-    environmentId:'paradise-sky', theme:Object.freeze({accent:'#f2c2a6'}), lyrics:null }),
+    environmentId:'paradise-sky', theme:Object.freeze({accent:'#f2c2a6'}), lyrics:'/data/sky-loft/lyrics/paradise.json' }),
 ])
 
 export const REALITIES = Object.freeze(Object.fromEntries(SONGS.map(song=>[song.id,song])))

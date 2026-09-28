@@ -1,0 +1,556 @@
+{
+  "schemaVersion": 1,
+  "song": {
+    "id": "paradise",
+    "title": "Paradise",
+    "artist": "Glamniverse",
+    "audioDurationSeconds": 299.472
+  },
+  "timing": {
+    "source": "CapCut auto-caption timestamps from six user screenshots",
+    "textAuthority": "User-provided approved Paradise lyrics",
+    "precision": "Source timestamps visible to nearest second; small editorial offsets split combined phrases.",
+    "status": "Prototype-ready; spot-check against the production MP3 in Quest before final sync approval."
+  },
+  "defaults": {
+    "lyricsEnabled": true,
+    "avoidImmediateFaceZone": true,
+    "placementStrategy": "preset-driven; engine chooses safe player-relative/world anchors"
+  },
+  "events": [
+    {
+      "section": "verse1",
+      "start": 53.0,
+      "text": "Another night, another train",
+      "preset": "VERSE_LEFT",
+      "end": 56.88
+    },
+    {
+      "section": "verse1",
+      "start": 57.0,
+      "text": "Same old streets, same old rain",
+      "preset": "VERSE_RIGHT",
+      "end": 60.88
+    },
+    {
+      "section": "verse1",
+      "start": 61.0,
+      "text": "Everybody's chasing time",
+      "preset": "VERSE_LEFT",
+      "end": 64.88
+    },
+    {
+      "section": "verse1",
+      "start": 65.0,
+      "text": "But tonight your hand's in mine",
+      "preset": "VERSE_RIGHT",
+      "end": 69.88
+    },
+    {
+      "section": "verse1",
+      "start": 70.0,
+      "text": "Windows down, we leave it all",
+      "preset": "VERSE_LEFT",
+      "end": 73.88
+    },
+    {
+      "section": "verse1",
+      "start": 74.0,
+      "text": "All the voices, all the walls",
+      "preset": "VERSE_RIGHT",
+      "end": 77.88
+    },
+    {
+      "section": "verse1",
+      "start": 78.0,
+      "text": "Nothing waiting back for us",
+      "preset": "VERSE_LEFT",
+      "end": 81.88
+    },
+    {
+      "section": "verse1",
+      "start": 82.0,
+      "text": "Just the stars and wanderlust",
+      "preset": "VERSE_RIGHT",
+      "end": 86.88
+    },
+    {
+      "section": "prechorus1",
+      "start": 87.0,
+      "text": "We don't need a map tonight",
+      "preset": "PRECHORUS_LEFT",
+      "end": 90.88
+    },
+    {
+      "section": "prechorus1",
+      "start": 91.0,
+      "text": "We don't need a reason why",
+      "preset": "PRECHORUS_RIGHT",
+      "end": 95.88
+    },
+    {
+      "section": "chorus1",
+      "start": 96.0,
+      "text": "Hold my hand",
+      "preset": "CHORUS_NEAR",
+      "end": 97.6
+    },
+    {
+      "section": "chorus1",
+      "start": 96.9,
+      "text": "Let's run away",
+      "preset": "CHORUS_FORWARD",
+      "end": 99.88
+    },
+    {
+      "section": "chorus1",
+      "start": 100.0,
+      "text": "No looking back",
+      "preset": "CHORUS_SIDE",
+      "end": 101.6
+    },
+    {
+      "section": "chorus1",
+      "start": 101.2,
+      "text": "To yesterday",
+      "preset": "CHORUS_FADE",
+      "end": 103.88
+    },
+    {
+      "section": "chorus1",
+      "start": 104.0,
+      "text": "Ocean sunsets",
+      "preset": "HORIZON_WIDE",
+      "end": 105.6
+    },
+    {
+      "section": "chorus1",
+      "start": 105.2,
+      "text": "Neon lights",
+      "preset": "HORIZON_GLOW",
+      "end": 107.88
+    },
+    {
+      "section": "chorus1",
+      "start": 108.0,
+      "text": "Let's go find",
+      "preset": "CHORUS_BUILD",
+      "end": 109.6
+    },
+    {
+      "section": "chorus1",
+      "start": 109.5,
+      "text": "Paradise",
+      "preset": "HERO_PARADISE",
+      "end": 111.88
+    },
+    {
+      "section": "chorus1",
+      "start": 112.0,
+      "text": "Hold my hand",
+      "preset": "CHORUS_NEAR",
+      "end": 113.6
+    },
+    {
+      "section": "chorus1",
+      "start": 113.2,
+      "text": "Don't be afraid",
+      "preset": "CHORUS_SOFT",
+      "end": 115.88
+    },
+    {
+      "section": "chorus1",
+      "start": 116.0,
+      "text": "Leave the ghosts",
+      "preset": "CHORUS_SIDE",
+      "end": 117.6
+    },
+    {
+      "section": "chorus1",
+      "start": 117.3,
+      "text": "We never saved",
+      "preset": "CHORUS_FADE",
+      "end": 120.88
+    },
+    {
+      "section": "chorus1",
+      "start": 121.0,
+      "text": "Ocean sunsets",
+      "preset": "HORIZON_WIDE",
+      "end": 122.6
+    },
+    {
+      "section": "chorus1",
+      "start": 122.2,
+      "text": "Neon lights",
+      "preset": "HORIZON_GLOW",
+      "end": 124.88
+    },
+    {
+      "section": "chorus1",
+      "start": 125.0,
+      "text": "Let's go find",
+      "preset": "CHORUS_BUILD",
+      "end": 126.6
+    },
+    {
+      "section": "chorus1",
+      "start": 126.5,
+      "text": "Paradise",
+      "preset": "HERO_PARADISE",
+      "end": 131.5
+    },
+    {
+      "section": "postchorus1",
+      "start": 140.0,
+      "text": "Paradise",
+      "preset": "HERO_ECHO",
+      "adlib": true,
+      "end": 144.88
+    },
+    {
+      "section": "verse2",
+      "start": 145.0,
+      "text": "City fading in the rearview glass",
+      "preset": "VERSE_LEFT",
+      "end": 146.88
+    },
+    {
+      "section": "verse2",
+      "start": 147.0,
+      "text": "Funny how the hurt can pass",
+      "preset": "VERSE_RIGHT",
+      "end": 148.88
+    },
+    {
+      "section": "verse2",
+      "start": 149.0,
+      "text": "When you're dancing in the dark",
+      "preset": "VERSE_LEFT",
+      "end": 150.88
+    },
+    {
+      "section": "verse2",
+      "start": 151.0,
+      "text": "With a fire inside your heart",
+      "preset": "VERSE_RIGHT",
+      "end": 152.88
+    },
+    {
+      "section": "verse2",
+      "start": 153.0,
+      "text": "Maybe we were born to roam",
+      "preset": "VERSE_LEFT",
+      "end": 154.88
+    },
+    {
+      "section": "verse2",
+      "start": 155.0,
+      "text": "Maybe nowhere feels like home",
+      "preset": "VERSE_RIGHT",
+      "end": 157.88
+    },
+    {
+      "section": "verse2",
+      "start": 158.0,
+      "text": "Maybe home is you and me",
+      "preset": "VERSE_LEFT",
+      "end": 159.88
+    },
+    {
+      "section": "verse2",
+      "start": 160.0,
+      "text": "Driving toward infinity",
+      "preset": "VERSE_RIGHT",
+      "end": 161.88
+    },
+    {
+      "section": "prechorus2",
+      "start": 162.0,
+      "text": "We don't need a map tonight",
+      "preset": "PRECHORUS_LEFT",
+      "end": 165.88
+    },
+    {
+      "section": "prechorus2",
+      "start": 166.0,
+      "text": "We don't need a reason why",
+      "preset": "PRECHORUS_RIGHT",
+      "end": 169.88
+    },
+    {
+      "section": "chorus2",
+      "start": 170.0,
+      "text": "Hold my hand",
+      "preset": "CHORUS_NEAR",
+      "end": 171.6
+    },
+    {
+      "section": "chorus2",
+      "start": 170.9,
+      "text": "Let's run away",
+      "preset": "CHORUS_FORWARD",
+      "end": 172.88
+    },
+    {
+      "section": "chorus2",
+      "start": 173.0,
+      "text": "No looking back",
+      "preset": "CHORUS_SIDE",
+      "end": 174.6
+    },
+    {
+      "section": "chorus2",
+      "start": 174.2,
+      "text": "To yesterday",
+      "preset": "CHORUS_FADE",
+      "end": 177.88
+    },
+    {
+      "section": "chorus2",
+      "start": 178.0,
+      "text": "Ocean sunsets",
+      "preset": "HORIZON_WIDE",
+      "end": 179.6
+    },
+    {
+      "section": "chorus2",
+      "start": 179.2,
+      "text": "Neon lights",
+      "preset": "HORIZON_GLOW",
+      "end": 182.88
+    },
+    {
+      "section": "chorus2",
+      "start": 183.0,
+      "text": "Let's go find",
+      "preset": "CHORUS_BUILD",
+      "end": 184.6
+    },
+    {
+      "section": "chorus2",
+      "start": 184.5,
+      "text": "Paradise",
+      "preset": "HERO_PARADISE",
+      "end": 186.88
+    },
+    {
+      "section": "chorus2",
+      "start": 187.0,
+      "text": "Hold my hand",
+      "preset": "CHORUS_NEAR",
+      "end": 188.6
+    },
+    {
+      "section": "chorus2",
+      "start": 188.2,
+      "text": "Don't be afraid",
+      "preset": "CHORUS_SOFT",
+      "end": 190.88
+    },
+    {
+      "section": "chorus2",
+      "start": 191.0,
+      "text": "Leave the ghosts",
+      "preset": "CHORUS_SIDE",
+      "end": 192.6
+    },
+    {
+      "section": "chorus2",
+      "start": 192.3,
+      "text": "We never saved",
+      "preset": "CHORUS_FADE",
+      "end": 194.88
+    },
+    {
+      "section": "chorus2",
+      "start": 195.0,
+      "text": "Ocean sunsets",
+      "preset": "HORIZON_WIDE",
+      "end": 196.6
+    },
+    {
+      "section": "chorus2",
+      "start": 196.2,
+      "text": "Neon lights",
+      "preset": "HORIZON_GLOW",
+      "end": 198.88
+    },
+    {
+      "section": "chorus2",
+      "start": 199.0,
+      "text": "Let's go find",
+      "preset": "CHORUS_BUILD",
+      "end": 200.6
+    },
+    {
+      "section": "chorus2",
+      "start": 200.5,
+      "text": "Paradise",
+      "preset": "HERO_PARADISE",
+      "end": 205.5
+    },
+    {
+      "section": "postchorus2",
+      "start": 210.0,
+      "text": "Paradise",
+      "preset": "HERO_ECHO",
+      "adlib": true,
+      "end": 215.0
+    },
+    {
+      "section": "bridge",
+      "start": 227.0,
+      "text": "If tomorrow never comes",
+      "preset": "BRIDGE_INTIMATE",
+      "end": 229.88
+    },
+    {
+      "section": "bridge",
+      "start": 230.0,
+      "text": "We'll still have this moment",
+      "preset": "BRIDGE_INTIMATE",
+      "end": 231.88
+    },
+    {
+      "section": "bridge",
+      "start": 232.0,
+      "text": "Lost between the waves and sky",
+      "preset": "BETWEEN_WAVES_SKY",
+      "end": 233.88
+    },
+    {
+      "section": "bridge",
+      "start": 234.0,
+      "text": "Like we always dreamed it",
+      "preset": "BRIDGE_FLOAT",
+      "end": 236.88
+    },
+    {
+      "section": "bridge",
+      "start": 237.0,
+      "text": "No more waiting",
+      "preset": "BRIDGE_DECLARATION",
+      "end": 238.6
+    },
+    {
+      "section": "bridge",
+      "start": 238.4,
+      "text": "No more fear",
+      "preset": "BRIDGE_DECLARATION",
+      "end": 240.88
+    },
+    {
+      "section": "bridge",
+      "start": 241.0,
+      "text": "The world disappears",
+      "preset": "WORLD_DISAPPEARS",
+      "end": 246.0
+    },
+    {
+      "section": "final_chorus",
+      "start": 247.0,
+      "text": "Hold my hand",
+      "preset": "CHORUS_NEAR",
+      "end": 248.6
+    },
+    {
+      "section": "final_chorus",
+      "start": 247.9,
+      "text": "Let's run away",
+      "preset": "CHORUS_FORWARD",
+      "end": 250.88
+    },
+    {
+      "section": "final_chorus",
+      "start": 251.0,
+      "text": "No looking back",
+      "preset": "CHORUS_SIDE",
+      "end": 252.6
+    },
+    {
+      "section": "final_chorus",
+      "start": 252.2,
+      "text": "To yesterday",
+      "preset": "CHORUS_FADE",
+      "end": 254.88
+    },
+    {
+      "section": "final_chorus",
+      "start": 255.0,
+      "text": "Ocean sunsets",
+      "preset": "HORIZON_WIDE",
+      "end": 256.6
+    },
+    {
+      "section": "final_chorus",
+      "start": 256.2,
+      "text": "Neon lights",
+      "preset": "HORIZON_GLOW",
+      "end": 258.88
+    },
+    {
+      "section": "final_chorus",
+      "start": 259.0,
+      "text": "Let's go find",
+      "preset": "CHORUS_BUILD",
+      "end": 260.6
+    },
+    {
+      "section": "final_chorus",
+      "start": 260.5,
+      "text": "Paradise",
+      "preset": "HERO_PARADISE",
+      "end": 262.88
+    },
+    {
+      "section": "final_chorus",
+      "start": 263.0,
+      "text": "Hold my hand",
+      "preset": "CHORUS_NEAR",
+      "end": 264.6
+    },
+    {
+      "section": "final_chorus",
+      "start": 263.9,
+      "text": "Let's run away",
+      "preset": "CHORUS_FORWARD",
+      "end": 266.88
+    },
+    {
+      "section": "final_chorus",
+      "start": 267.0,
+      "text": "Far beyond the city lights",
+      "preset": "HORIZON_TRAVEL",
+      "end": 271.88
+    },
+    {
+      "section": "final_chorus",
+      "start": 272.0,
+      "text": "Ocean sunsets",
+      "preset": "HORIZON_WIDE",
+      "end": 273.6
+    },
+    {
+      "section": "final_chorus",
+      "start": 273.2,
+      "text": "Neon lights",
+      "preset": "HORIZON_GLOW",
+      "end": 275.88
+    },
+    {
+      "section": "final_chorus",
+      "start": 276.0,
+      "text": "Let's go find",
+      "preset": "CHORUS_BUILD",
+      "end": 277.6
+    },
+    {
+      "section": "final_chorus",
+      "start": 277.5,
+      "text": "Paradise",
+      "preset": "HERO_PARADISE",
+      "end": 280.88
+    }
+  ]
+}
