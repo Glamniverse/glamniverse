@@ -1297,16 +1297,15 @@ window.openSmashTheHate = async function () {
 }
 
 
-// Fail closed outside Vite dev / Vercel Preview. Rollup removes the loft import
-// and entry from ordinary Production builds; no hostname guessing or settings changes.
-if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
+// Public Sky Loft release: reuse the existing experience card and shared XR lifecycle.
+{
   stationaryVRWorlds.add('skyLoft')
   import('./games/sky-loft/index.js').then(({ createSkyLoft }) => {
     const card = document.createElement('article')
     card.className = 'vr-experience-card'
     const title = document.createElement('h4'); title.textContent = 'THE SKY LOFT'
     const description = document.createElement('p'); description.textContent = 'Choose a song. Change your reality.'
-    const entry = document.createElement('button'); entry.id = 'sky-loft-entry'; entry.textContent = 'THE SKY LOFT — M2 PREVIEW'
+    const entry = document.createElement('button'); entry.id = 'sky-loft-entry'; entry.textContent = 'THE SKY LOFT'
     card.append(title, description, entry)
     async function openLoft() {
       if (deferUntilVRExit(openLoft)) return
@@ -1327,7 +1326,7 @@ if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
     }
     entry.onclick = openLoft
     document.querySelector('#vr-experience-grid').appendChild(card)
-  }).catch(error => console.warn('Sky Loft Preview entry unavailable:', error))
+  }).catch(error => console.warn('Sky Loft entry unavailable:', error))
 }
 function showInHisMindRoom() {
   disposeCurrentWorld()

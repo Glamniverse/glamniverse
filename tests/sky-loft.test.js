@@ -122,18 +122,16 @@ test('geometry budget is bounded; no transparent materials, shadows or frame ani
   assert.ok(CONFIG.selectorDistance<5);h.game.xrHooks.dispose()
 })
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8')
-test('entry is fail-closed to Preview/development; public games remain outside gate',()=>{
-  const gate="if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview')"
-  assert.ok(source.includes(gate))
-  const block=source.slice(source.indexOf(gate),source.indexOf('function showInHisMindRoom'))
-  assert.match(block,/stationaryVRWorlds.add\('skyLoft'\)/)
-  assert.match(block,/import\('\.\/games\/sky-loft\/index.js'\)/)
-  for(const [dev,env,want] of [[true,undefined,true],[false,'preview',true],[false,'production',false],[false,undefined,false]]){
-    const condition=gate.slice(4,-1).replace('import.meta.env.DEV',String(dev)).replace('import.meta.env.VITE_VERCEL_ENV',JSON.stringify(env)??'undefined')
-    assert.equal(Function('return '+condition)(),want)
-  }
-  assert.match(source.slice(0,source.indexOf(gate)),/createAllEyesOnMe/)
-  assert.match(block,/checkVRExperienceSupport\('skyLoft'/)
+test('public Sky Loft registers once without Preview flags, keeping capability checks and public games',()=>{
+  const block=source.slice(source.indexOf('// Public Sky Loft release:'),source.indexOf('function showInHisMindRoom'))
+  assert.ok(!block.includes('import.meta.env'))
+  assert.equal(source.split("stationaryVRWorlds.add('skyLoft')").length-1,1)
+  assert.equal(source.split("import('./games/sky-loft/index.js')").length-1,1)
+  assert.ok(block.includes("entry.textContent = 'THE SKY LOFT'"))
+  assert.ok(!block.includes('PREVIEW'))
+  assert.ok(block.includes('Choose a song. Change your reality.'))
+  assert.ok(block.includes("checkVRExperienceSupport('skyLoft'"))
+  assert.ok(source.slice(0,source.indexOf('// Public Sky Loft release:')).includes('createAllEyesOnMe'))
 })
 test('shared warning blocks loft factory without XR and cancels pending Back',async()=>{
   const nodes=new Map()
