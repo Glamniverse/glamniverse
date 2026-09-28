@@ -71,7 +71,7 @@ test('OFF clears immediately; ON at mid-song displays only currently relevant ev
 test('leaving Paradise clears even before transition starts; returning reuses the atlas',async()=>{
   const h=setup();await h.ready();h.tick(54)
   for(const song of ['daydream','neon-therapy']){
-    h.lyrics.prepare(REALITIES[song]);h.tick(54,true,{...state,requestedReality:song});assert.equal(h.visible().length,0)
+    h.lyrics.prepare({...REALITIES[song],lyrics:null});h.tick(54,true,{...state,requestedReality:song});assert.equal(h.visible().length,0)
     h.tick(54,true,{...state,activeReality:song,requestedReality:song});assert.equal(h.visible().length,0)
     await h.ready();h.tick(54,true,{...state,realityTransition:true});assert.equal(h.visible().length,0)
     h.tick(54);assert.equal(h.visible().length,1)
@@ -185,4 +185,27 @@ test('starting-position lyrics clear selector and overlap stays within comfortab
     }
   }
   h.game.xrHooks.dispose()
+})
+
+
+test('M4.1 datasets fit existing presets and switch through one engine without stale lyrics',async()=>{
+  const sets=Object.fromEntries(Object.keys(REALITIES).map(id=>[id,JSON.parse(readFileSync(new URL('../public'+REALITIES[id].lyrics,import.meta.url)))]))
+  assert.equal(sets['neon-therapy'].events.length,58);assert.equal(sets.daydream.events.length,35)
+  for(const [id,d] of Object.entries(sets))validateLyricData(d,id)
+  for(const [id,words] of [['neon-therapy',['2 AM','No sleep','City lights','Neon therapy','Midnight rush','Lost inside the city']],['daydream',['Glamniverse...','Daydream...','Lost inside a daydream','Daydreaming about you','Maybe dreams are all we need','Is one beautiful dream...','To remember who we used to be...',"Don't wake me up"]]]){
+    for(const text of words)assert.ok(sets[id].events.some(e=>e.text===text),text)
+  }
+  const root=new THREE.Group(),l=createSpatialLyrics(root,{load:async url=>sets[url.split('/').at(-1).replace('.json','')]})
+  let atlas=null,releases=0
+  for(const id of ['neon-therapy','daydream','paradise','neon-therapy']){
+    l.prepare(REALITIES[id]);assert.equal(l.stats().activeLyrics,0);await settle()
+    assert.equal(l.stats().lyricStatus,'ready');assert.equal(root.children.length,1);assert.equal(root.children[0].children.length,4)
+    const songState={activeReality:id,requestedReality:id,realityTransition:false}
+    for(const event of sets[id].events){l.update({songId:id,seconds:event.start+.05,playing:true},songState,head,front);assert.ok(l.stats().activeLyrics>0)}
+    atlas=root.children[0].children[0].material.map
+    assert.equal(atlas.image.height,id==='neon-therapy'?4096:2048)
+    atlas.addEventListener('dispose',()=>releases++)
+    l.update({songId:id,seconds:10,playing:true},{...songState,requestedReality:'switching'},head,front);assert.equal(l.stats().activeLyrics,0)
+  }
+  l.dispose();assert.equal(releases,4);assert.equal(root.children.length,0)
 })

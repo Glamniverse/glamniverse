@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "song": {
+    "id": "daydream",
+    "title": "Daydream",
+    "artist": "Glamniverse",
+    "audioDurationSeconds": 244.56
+  },
+  "timing": {
+    "source": "CapCut auto-caption timestamps from four user screenshots",
+    "textAuthority": "User-provided approved Daydream lyrics",
+    "precision": "Source timestamps visible to nearest second; small editorial offsets split combined captions.",
+    "status": "Prototype-ready; Quest spot-check recommended before production approval.",
+    "notes": [
+      "CapCut misheard several whispered intro/outro phrases; approved lyric order and wording were preserved.",
+      "00:31 Daydream is retained as a soft ad-lib echo because CapCut detected a clear standalone occurrence.",
+      "Bridge first two approved lines were split from one CapCut caption using a small editorial offset.",
+      "Final Don't wake me up is treated as one approved phrase beginning around 03:39 despite CapCut splitting/mishearing it."
+    ]
+  },
+  "defaults": {
+    "lyricsEnabled": true,
+    "avoidImmediateFaceZone": true,
+    "placementStrategy": "preset-driven; engine chooses safe player-relative/world anchors"
+  },
+  "events": [
+    {
+      "section": "intro",
+      "start": 2.0,
+      "text": "Glamniverse...",
+      "preset": "BRIDGE_FLOAT",
+      "end": 7.5
+    },
+    {
+      "section": "intro",
+      "start": 8.0,
+      "text": "Daydream...",
+      "preset": "HERO_ECHO",
+      "end": 10.85
+    },
+    {
+      "section": "intro",
+      "start": 11.0,
+      "text": "Glamniverse...",
+      "preset": "BRIDGE_FLOAT",
+      "end": 16.5
+    },
+    {
+      "section": "intro",
+      "start": 20.0,
+      "text": "Daydream...",
+      "preset": "HERO_ECHO",
+      "end": 25.5
+    },
+    {
+      "section": "intro",
+      "start": 31.0,
+      "text": "Daydream...",
+      "preset": "HERO_ECHO",
+      "adlib": true,
+      "end": 36.5
+    },
+    {
+      "section": "verse1",
+      "start": 52.0,
+      "text": "Lost inside a daydream",
+      "preset": "VERSE_LEFT",
+      "end": 55.85
+    },
+    {
+      "section": "verse1",
+      "start": 56.0,
+      "text": "Looking in your eyes",
+      "preset": "VERSE_RIGHT",
+      "end": 59.85
+    },
+    {
+      "section": "verse1",
+      "start": 60.0,
+      "text": "Everything feels different",
+      "preset": "VERSE_LEFT",
+      "end": 63.85
+    },
+    {
+      "section": "verse1",
+      "start": 64.0,
+      "text": "When you're by my side",
+      "preset": "VERSE_RIGHT",
+      "end": 66.0
+    },
+    {
+      "section": "prechorus1",
+      "start": 66.0,
+      "text": "Every little heartbeat",
+      "preset": "PRECHORUS_LEFT",
+      "end": 68.85
+    },
+    {
+      "section": "prechorus1",
+      "start": 69.0,
+      "text": "Feels a little more real",
+      "preset": "PRECHORUS_RIGHT",
+      "end": 71.85
+    },
+    {
+      "section": "chorus1",
+      "start": 72.0,
+      "text": "Daydreaming about you",
+      "preset": "CHORUS_NEAR",
+      "end": 75.85
+    },
+    {
+      "section": "chorus1",
+      "start": 76.0,
+      "text": "Daydreaming about us",
+      "preset": "CHORUS_FORWARD",
+      "end": 80.85
+    },
+    {
+      "section": "chorus1",
+      "start": 81.0,
+      "text": "Maybe dreams are all we need",
+      "preset": "HORIZON_WIDE",
+      "end": 83.85
+    },
+    {
+      "section": "chorus1",
+      "start": 84.0,
+      "text": "To finally believe",
+      "preset": "HERO_PARADISE",
+      "end": 89.5
+    },
+    {
+      "section": "verse2",
+      "start": 106.0,
+      "text": "Chasing little moments",
+      "preset": "VERSE_LEFT",
+      "end": 108.85
+    },
+    {
+      "section": "verse2",
+      "start": 109.0,
+      "text": "Before they disappear",
+      "preset": "CHORUS_FADE",
+      "end": 113.85
+    },
+    {
+      "section": "verse2",
+      "start": 114.0,
+      "text": "Holding on to magic",
+      "preset": "VERSE_RIGHT",
+      "end": 117.85
+    },
+    {
+      "section": "verse2",
+      "start": 118.0,
+      "text": "Like you're still right here",
+      "preset": "VERSE_LEFT",
+      "end": 120.0
+    },
+    {
+      "section": "prechorus2",
+      "start": 120.0,
+      "text": "Every little heartbeat",
+      "preset": "PRECHORUS_LEFT",
+      "end": 123.85
+    },
+    {
+      "section": "prechorus2",
+      "start": 124.0,
+      "text": "Feels a little more real",
+      "preset": "PRECHORUS_RIGHT",
+      "end": 126.85
+    },
+    {
+      "section": "chorus2",
+      "start": 127.0,
+      "text": "Daydreaming about you",
+      "preset": "CHORUS_NEAR",
+      "end": 130.85
+    },
+    {
+      "section": "chorus2",
+      "start": 131.0,
+      "text": "Daydreaming about us",
+      "preset": "CHORUS_FORWARD",
+      "end": 134.85
+    },
+    {
+      "section": "chorus2",
+      "start": 135.0,
+      "text": "Maybe dreams are all we need",
+      "preset": "HORIZON_WIDE",
+      "end": 137.85
+    },
+    {
+      "section": "chorus2",
+      "start": 138.0,
+      "text": "To finally believe",
+      "preset": "HERO_PARADISE",
+      "end": 143.5
+    },
+    {
+      "section": "bridge",
+      "start": 159.0,
+      "text": "Sometimes all it takes",
+      "preset": "BRIDGE_INTIMATE",
+      "end": 162.15
+    },
+    {
+      "section": "bridge",
+      "start": 162.3,
+      "text": "Is one beautiful dream...",
+      "preset": "BETWEEN_WAVES_SKY",
+      "end": 165.85
+    },
+    {
+      "section": "bridge",
+      "start": 166.0,
+      "text": "To remember who we used to be...",
+      "preset": "WORLD_DISAPPEARS",
+      "end": 171.5
+    },
+    {
+      "section": "final_chorus",
+      "start": 193.0,
+      "text": "Daydreaming about you",
+      "preset": "CHORUS_NEAR",
+      "end": 196.85
+    },
+    {
+      "section": "final_chorus",
+      "start": 197.0,
+      "text": "Daydreaming about us",
+      "preset": "CHORUS_FORWARD",
+      "end": 200.85
+    },
+    {
+      "section": "final_chorus",
+      "start": 201.0,
+      "text": "Maybe dreams are all we need",
+      "preset": "HORIZON_WIDE",
+      "end": 203.85
+    },
+    {
+      "section": "final_chorus",
+      "start": 204.0,
+      "text": "To finally believe",
+      "preset": "HERO_PARADISE",
+      "end": 208.85
+    },
+    {
+      "section": "outro",
+      "start": 209.0,
+      "text": "Daydream...",
+      "preset": "HERO_ECHO",
+      "end": 212.85
+    },
+    {
+      "section": "outro",
+      "start": 213.0,
+      "text": "Glamniverse...",
+      "preset": "BRIDGE_FLOAT",
+      "end": 218.5
+    },
+    {
+      "section": "outro",
+      "start": 219.0,
+      "text": "Don't wake me up",
+      "preset": "WORLD_DISAPPEARS",
+      "end": 224.5
+    }
+  ]
+}

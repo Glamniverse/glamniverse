@@ -41,7 +41,7 @@ test('declarative realities map exact preserved Neon and new Daydream assets/spe
   assert.equal(ENVIRONMENTS[REALITIES['neon-therapy'].environmentId].panorama,'/images/sky-loft/neon-city-loft.png')
   assert.equal(ENVIRONMENTS[REALITIES['neon-therapy'].environmentId].visitors,'neon-mantas')
   assert.equal(ENVIRONMENTS[REALITIES.daydream.environmentId].visitors,'butterflies')
-  for(const r of Object.values(REALITIES)){assert.ok(Object.isFrozen(r));assert.equal(r.lyrics,r.id==='paradise'?'/data/sky-loft/lyrics/paradise.json':null);assert.ok(readFileSync(new URL('../public'+r.audioSrc,import.meta.url)).length>1000000)}
+  for(const r of Object.values(REALITIES)){assert.ok(Object.isFrozen(r));assert.equal(r.lyrics,'/data/sky-loft/lyrics/'+r.id+'.json');assert.ok(readFileSync(new URL('../public'+r.audioSrc,import.meta.url)).length>1000000)}
   const p=readFileSync(new URL('../public/images/sky-loft/daydream.png',import.meta.url))
   assert.equal(p.readUInt32BE(16),1774);assert.equal(p.readUInt32BE(20),887)
   assert.equal(createHash('sha256').update(p).digest('hex'),'74ef11dc788195aad56035da5807be54d5c554b71c0c04f6962381dec1469520')
@@ -172,7 +172,7 @@ import {JELLYFISH,createJellyfish,jellyfishPosition} from '../src/games/sky-loft
 test('Paradise assets, theme, lyric placeholder and visitor mapping',()=>{
   const r=REALITIES.paradise,e=ENVIRONMENTS[r.environmentId]
   assert.equal(r.audioSrc,'/audio/sky-loft/paradise.mp3');assert.equal(e.panorama,'/images/sky-loft/paradise.png')
-  assert.equal(e.visitors,'jellyfish');assert.equal(r.lyrics,r.id==='paradise'?'/data/sky-loft/lyrics/paradise.json':null);assert.equal(e.yaw,Math.PI/2)
+  assert.equal(e.visitors,'jellyfish');assert.equal(r.lyrics,'/data/sky-loft/lyrics/'+r.id+'.json');assert.equal(e.yaw,Math.PI/2)
   const image=readFileSync(new URL('../public'+e.panorama,import.meta.url))
   assert.equal(image.readUInt32BE(16),1774);assert.equal(image.readUInt32BE(20),887)
   assert.equal(createHash('sha256').update(image).digest('hex'),'4dd196f80910dace9a966c686ebfa335ff07ae9be1dcdaF2f2ab6e0d75ee17b7'.toLowerCase())

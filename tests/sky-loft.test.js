@@ -39,7 +39,7 @@ function harness(){
 test('two immutable prototype songs reference valid environment; verified Neon Therapy audio and no lyrics',()=>{
   assert.equal(SONGS.length,3)
   assert.equal(new Set(SONGS.map(s=>s.id)).size,3)
-  for(const song of SONGS){assert.ok(ENVIRONMENTS[song.environmentId]);assert.equal(song.audioSrc,song.id==='neon-therapy'?'/neon-therapy.mp3':'/audio/sky-loft/'+song.id+'.mp3');assert.equal(song.lyrics,song.id==='paradise'?'/data/sky-loft/lyrics/paradise.json':null);assert.ok(Object.isFrozen(song))}
+  for(const song of SONGS){assert.ok(ENVIRONMENTS[song.environmentId]);assert.equal(song.audioSrc,song.id==='neon-therapy'?'/neon-therapy.mp3':'/audio/sky-loft/'+song.id+'.mp3');assert.equal(song.lyrics,'/data/sky-loft/lyrics/'+song.id+'.json');assert.ok(Object.isFrozen(song))}
 })
 test('selection is validated, idempotent and disabled after disposal',()=>{
   const changes=[];const state=createSelection(song=>changes.push(song.id))

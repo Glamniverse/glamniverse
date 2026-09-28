@@ -1,6 +1,6 @@
 // Metres relative to the current player, resolved ONCE per event in loft space.
 // All text stays beyond the front terrace, above furniture; no camera parenting.
-export const LYRIC_LIMITS = Object.freeze({ maxActive: 4, atlasSize: 2048, cellWidth: 1024, cellHeight: 96, maxPhrases: 42 })
+export const LYRIC_LIMITS = Object.freeze({ maxActive: 4, atlasSize: 2048, cellWidth: 1024, cellHeight: 96, maxPhrases: 84 })
 const preset=(distance,width,height,side=0,travel=0,color='#fff2dd',opacity=1,fade=.4,rise=.15)=>
   Object.freeze({distance,width,height,side,travel,color,opacity,fade,rise})
 export const LYRIC_PRESETS=Object.freeze({

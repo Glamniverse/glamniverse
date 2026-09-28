@@ -4,7 +4,9 @@ import {LYRIC_LIMITS as L,LYRIC_PRESETS,validateLyricData,fillActiveEvents} from
 // One atlas per loaded song. Browser serif font, rasterized once; no font download.
 // Tight UV crops keep short hero words large without stretching the typeface.
 export function createLyricAtlas(data){
-  const canvas=document.createElement('canvas');canvas.width=canvas.height=L.atlasSize
+  const canvas=document.createElement('canvas');canvas.width=L.atlasSize
+  // Preserve the approved 2048-square atlas for <=42 phrases; taller data uses one 4096-high atlas.
+  canvas.height=Math.max(L.atlasSize,THREE.MathUtils.ceilPowerOfTwo(Math.ceil(new Set(data.events.map(e=>e.text)).size/2)*L.cellHeight))
   const ctx=canvas.getContext('2d'),entries=new Map()
   ctx.clearRect(0,0,canvas.width,canvas.height)
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round'
@@ -18,7 +20,7 @@ export function createLyricAtlas(data){
     const width=Math.min(L.cellWidth-8,Math.ceil(ctx.measureText(displayText).width)+24)
     ctx.strokeStyle='#171322';ctx.lineWidth=3;ctx.strokeText(displayText,x+L.cellWidth/2,y+L.cellHeight/2)
     ctx.fillStyle='#ffffff';ctx.fillText(displayText,x+L.cellWidth/2,y+L.cellHeight/2)
-    entries.set(text,{u:(x+(L.cellWidth-width)/2)/L.atlasSize,v:1-(y+L.cellHeight)/L.atlasSize,w:width/L.atlasSize,h:L.cellHeight/L.atlasSize,aspect:width/L.cellHeight})
+    entries.set(text,{u:(x+(L.cellWidth-width)/2)/L.atlasSize,v:1-(y+L.cellHeight)/canvas.height,w:width/L.atlasSize,h:L.cellHeight/canvas.height,aspect:width/L.cellHeight})
   }
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace
   texture.anisotropy=1

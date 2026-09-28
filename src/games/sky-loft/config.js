@@ -22,9 +22,9 @@ export const ENVIRONMENTS = Object.freeze({
 export const TRANSITION_SECONDS = 2.4
 export const SONGS = Object.freeze([
   Object.freeze({ id: 'neon-therapy', title: 'Neon Therapy', audioSrc: '/neon-therapy.mp3',
-    environmentId: 'sky-city', theme: Object.freeze({ accent: '#66d9ef' }), lyrics: null }),
+    environmentId: 'sky-city', theme: Object.freeze({ accent: '#66d9ef' }), lyrics: '/data/sky-loft/lyrics/neon-therapy.json' }),
   Object.freeze({ id: 'daydream', title: 'Daydream', audioSrc: '/audio/sky-loft/daydream.mp3',
-    environmentId: 'daydream-sky', theme: Object.freeze({ accent: '#edb4df' }), lyrics: null }),
+    environmentId: 'daydream-sky', theme: Object.freeze({ accent: '#edb4df' }), lyrics: '/data/sky-loft/lyrics/daydream.json' }),
   Object.freeze({ id:'paradise', title:'Paradise', audioSrc:'/audio/sky-loft/paradise.mp3',
     environmentId:'paradise-sky', theme:Object.freeze({accent:'#f2c2a6'}), lyrics:'/data/sky-loft/lyrics/paradise.json' }),
 ])

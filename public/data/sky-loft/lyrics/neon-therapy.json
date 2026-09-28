@@ -1,0 +1,491 @@
+{
+  "schemaVersion": 1,
+  "song": {
+    "id": "neon-therapy",
+    "title": "Neon Therapy",
+    "artist": "Glamniverse",
+    "audioDurationSeconds": 167.2
+  },
+  "timing": {
+    "source": "CapCut auto-caption timestamps from five user screenshots",
+    "textAuthority": "User-provided approved Neon Therapy lyrics",
+    "precision": "Visible CapCut timestamps are approximately one-second precision; split captions and untranscribed Oh-oh-oh vocals use small editorial/interpolated offsets.",
+    "status": "Prototype-ready; hardware spot-check against the production MP3 before final sync approval.",
+    "notes": [
+      "CapCut misheard several phrases; wording was corrected strictly to the approved lyrics.",
+      "CapCut did not reliably caption the Oh-oh-oh vocals in the Drop; their starts are interpolated between surrounding timestamp anchors.",
+      "A CapCut-only 'ready ready ready' near 01:43 and trailing 'yeah yeah' near 01:59 were not added because they are absent from the approved lyric text."
+    ]
+  },
+  "defaults": {
+    "lyricsEnabled": true,
+    "avoidImmediateFaceZone": true,
+    "placementStrategy": "preset-driven; engine chooses safe player-relative/world anchors"
+  },
+  "events": [
+    {
+      "section": "intro",
+      "start": 6.0,
+      "end": 10.5,
+      "text": "2 AM",
+      "preset": "BRIDGE_DECLARATION",
+      "timingNote": "CapCut 00:06"
+    },
+    {
+      "section": "intro",
+      "start": 10.0,
+      "end": 14.5,
+      "text": "No sleep",
+      "preset": "BRIDGE_INTIMATE",
+      "timingNote": "CapCut 00:10"
+    },
+    {
+      "section": "intro",
+      "start": 14.0,
+      "end": 16.55,
+      "text": "City lights",
+      "preset": "HORIZON_GLOW",
+      "timingNote": "split from CapCut 00:14 caption"
+    },
+    {
+      "section": "intro",
+      "start": 16.0,
+      "end": 20.5,
+      "text": "Calling me",
+      "preset": "BRIDGE_FLOAT",
+      "timingNote": "editorial split inside CapCut 00:14 caption"
+    },
+    {
+      "section": "verse1",
+      "start": 20.0,
+      "end": 21.65,
+      "text": "Streetlights flicker",
+      "preset": "VERSE_LEFT",
+      "timingNote": "split from CapCut 00:20 caption"
+    },
+    {
+      "section": "verse1",
+      "start": 21.1,
+      "end": 22.55,
+      "text": "Black sky glow",
+      "preset": "VERSE_RIGHT",
+      "timingNote": "editorial split inside CapCut 00:20 caption"
+    },
+    {
+      "section": "verse1",
+      "start": 22.0,
+      "end": 23.55,
+      "text": "Music loud",
+      "preset": "VERSE_LEFT",
+      "timingNote": "split from CapCut 00:22 caption"
+    },
+    {
+      "section": "verse1",
+      "start": 23.0,
+      "end": 24.55,
+      "text": "Head down low",
+      "preset": "VERSE_RIGHT",
+      "timingNote": "editorial split inside CapCut 00:22 caption"
+    },
+    {
+      "section": "verse1",
+      "start": 24.0,
+      "end": 26.55,
+      "text": "Cold air running through my lungs",
+      "preset": "VERSE_LEFT",
+      "timingNote": "CapCut 00:24"
+    },
+    {
+      "section": "verse1",
+      "start": 26.0,
+      "end": 28.55,
+      "text": "Trying to outrun what I’ve become",
+      "preset": "VERSE_RIGHT",
+      "timingNote": "CapCut 00:26; corrected wording"
+    },
+    {
+      "section": "verse1",
+      "start": 28.0,
+      "end": 29.55,
+      "text": "Red lights",
+      "preset": "HORIZON_GLOW",
+      "timingNote": "split from CapCut 00:28 caption"
+    },
+    {
+      "section": "verse1",
+      "start": 29.0,
+      "end": 30.55,
+      "text": "Blue signs",
+      "preset": "HORIZON_GLOW",
+      "timingNote": "editorial split inside CapCut 00:28 caption"
+    },
+    {
+      "section": "verse1",
+      "start": 30.0,
+      "end": 32.55,
+      "text": "Blurred out bodies passing by",
+      "preset": "VERSE_LEFT",
+      "timingNote": "CapCut 00:30"
+    },
+    {
+      "section": "verse1",
+      "start": 32.0,
+      "end": 34.55,
+      "text": "Every road feels so alive",
+      "preset": "VERSE_RIGHT",
+      "timingNote": "CapCut 00:32; corrected from misheard caption"
+    },
+    {
+      "section": "verse1",
+      "start": 34.0,
+      "end": 37.55,
+      "text": "When I disappear at night",
+      "preset": "CHORUS_FADE",
+      "timingNote": "CapCut 00:34"
+    },
+    {
+      "section": "prechorus",
+      "start": 37.0,
+      "end": 40.55,
+      "text": "No destination",
+      "preset": "PRECHORUS_LEFT",
+      "timingNote": "CapCut 00:37"
+    },
+    {
+      "section": "prechorus",
+      "start": 40.0,
+      "end": 42.55,
+      "text": "Just motion",
+      "preset": "PRECHORUS_RIGHT",
+      "timingNote": "split from CapCut 00:40 caption"
+    },
+    {
+      "section": "prechorus",
+      "start": 42.0,
+      "end": 44.55,
+      "text": "Neon therapy",
+      "preset": "HORIZON_GLOW",
+      "timingNote": "editorial split inside CapCut 00:40 caption"
+    },
+    {
+      "section": "prechorus",
+      "start": 44.0,
+      "end": 47.55,
+      "text": "Slow emotion",
+      "preset": "CHORUS_SOFT",
+      "timingNote": "CapCut 00:44; corrected from 'slow motion'"
+    },
+    {
+      "section": "chorus",
+      "start": 47.0,
+      "end": 48.65,
+      "text": "Neon therapy",
+      "preset": "HERO_PARADISE",
+      "timingNote": "CapCut 00:47"
+    },
+    {
+      "section": "chorus",
+      "start": 48.1,
+      "end": 50.55,
+      "text": "I let the city swallow me",
+      "preset": "CHORUS_FORWARD",
+      "timingNote": "same CapCut 00:47 caption; editorial split"
+    },
+    {
+      "section": "chorus",
+      "start": 50.0,
+      "end": 51.55,
+      "text": "Late night energy",
+      "preset": "CHORUS_NEAR",
+      "timingNote": "CapCut 00:50"
+    },
+    {
+      "section": "chorus",
+      "start": 51.0,
+      "end": 54.55,
+      "text": "Running through my veins endlessly",
+      "preset": "HORIZON_TRAVEL",
+      "timingNote": "CapCut 00:51"
+    },
+    {
+      "section": "chorus",
+      "start": 54.0,
+      "end": 55.75,
+      "text": "Neon therapy",
+      "preset": "HERO_ECHO",
+      "timingNote": "split from CapCut 00:54 caption"
+    },
+    {
+      "section": "chorus",
+      "start": 55.2,
+      "end": 58.55,
+      "text": "Moonlight on empty streets",
+      "preset": "HORIZON_WIDE",
+      "timingNote": "editorial split inside CapCut 00:54 caption"
+    },
+    {
+      "section": "chorus",
+      "start": 58.0,
+      "end": 60.55,
+      "text": "Losing track of space and time",
+      "preset": "CHORUS_FADE",
+      "timingNote": "CapCut 00:58"
+    },
+    {
+      "section": "chorus",
+      "start": 60.0,
+      "end": 62.55,
+      "text": "While the whole world sleeps",
+      "preset": "BRIDGE_FLOAT",
+      "timingNote": "CapCut 01:00"
+    },
+    {
+      "section": "drop",
+      "start": 62.0,
+      "end": 64.55,
+      "text": "Oh-oh-oh",
+      "preset": "HERO_ECHO",
+      "timingNote": "inferred between CapCut 01:00 and 01:04"
+    },
+    {
+      "section": "drop",
+      "start": 64.0,
+      "end": 66.55,
+      "text": "Midnight rush",
+      "preset": "CHORUS_NEAR",
+      "timingNote": "CapCut 01:04"
+    },
+    {
+      "section": "drop",
+      "start": 66.0,
+      "end": 67.55,
+      "text": "Oh-oh-oh",
+      "preset": "HERO_ECHO",
+      "timingNote": "inferred between CapCut 01:04 and 01:07"
+    },
+    {
+      "section": "drop",
+      "start": 67.0,
+      "end": 70.05,
+      "text": "Can’t think too much",
+      "preset": "CHORUS_SIDE",
+      "timingNote": "CapCut 01:07"
+    },
+    {
+      "section": "drop",
+      "start": 69.5,
+      "end": 72.55,
+      "text": "Oh-oh-oh",
+      "preset": "HERO_ECHO",
+      "timingNote": "inferred before CapCut 01:12"
+    },
+    {
+      "section": "drop",
+      "start": 72.0,
+      "end": 75.55,
+      "text": "Neon therapy",
+      "preset": "HERO_PARADISE",
+      "timingNote": "CapCut 01:12; corrected from misheard caption"
+    },
+    {
+      "section": "drop",
+      "start": 75.0,
+      "end": 78.55,
+      "text": "The night gets the best of me",
+      "preset": "CHORUS_FADE",
+      "timingNote": "CapCut 01:15"
+    },
+    {
+      "section": "verse2",
+      "start": 78.0,
+      "end": 80.55,
+      "text": "Headlights dance across my face",
+      "preset": "VERSE_LEFT",
+      "timingNote": "CapCut 01:18"
+    },
+    {
+      "section": "verse2",
+      "start": 80.0,
+      "end": 82.55,
+      "text": "Everybody moving fast",
+      "preset": "VERSE_RIGHT",
+      "timingNote": "split from CapCut 01:20 caption"
+    },
+    {
+      "section": "verse2",
+      "start": 82.0,
+      "end": 84.55,
+      "text": "But I feel stuck in place",
+      "preset": "CHORUS_FADE",
+      "timingNote": "editorial split inside CapCut 01:20 caption"
+    },
+    {
+      "section": "verse2",
+      "start": 84.0,
+      "end": 86.55,
+      "text": "Maybe I was chasing ghosts",
+      "preset": "VERSE_LEFT",
+      "timingNote": "CapCut 01:24; corrected from 'goals'"
+    },
+    {
+      "section": "verse2",
+      "start": 86.0,
+      "end": 88.55,
+      "text": "Maybe I just hate being home",
+      "preset": "VERSE_RIGHT",
+      "timingNote": "CapCut 01:26"
+    },
+    {
+      "section": "verse2",
+      "start": 88.0,
+      "end": 89.55,
+      "text": "Silver skyline",
+      "preset": "HORIZON_WIDE",
+      "timingNote": "split from CapCut 01:28 caption"
+    },
+    {
+      "section": "verse2",
+      "start": 89.0,
+      "end": 90.55,
+      "text": "Dirty dreams",
+      "preset": "VERSE_RIGHT",
+      "timingNote": "editorial split inside CapCut 01:28 caption"
+    },
+    {
+      "section": "verse2",
+      "start": 90.0,
+      "end": 92.55,
+      "text": "Static noise inside of me",
+      "preset": "VERSE_LEFT",
+      "timingNote": "CapCut 01:30"
+    },
+    {
+      "section": "verse2",
+      "start": 92.0,
+      "end": 93.55,
+      "text": "But the silence hits different",
+      "preset": "BRIDGE_INTIMATE",
+      "timingNote": "CapCut 01:32; corrected wording"
+    },
+    {
+      "section": "verse2",
+      "start": 93.0,
+      "end": 95.55,
+      "text": "When the city breathes with me",
+      "preset": "BRIDGE_FLOAT",
+      "timingNote": "CapCut 01:33"
+    },
+    {
+      "section": "bridge",
+      "start": 95.0,
+      "end": 96.55,
+      "text": "No sleep",
+      "preset": "BRIDGE_DECLARATION",
+      "timingNote": "split from CapCut 01:35 caption"
+    },
+    {
+      "section": "bridge",
+      "start": 96.0,
+      "end": 97.55,
+      "text": "No peace",
+      "preset": "BRIDGE_DECLARATION",
+      "timingNote": "editorial split inside CapCut 01:35 caption"
+    },
+    {
+      "section": "bridge",
+      "start": 97.0,
+      "end": 99.55,
+      "text": "Just neon therapy",
+      "preset": "HERO_ECHO",
+      "timingNote": "CapCut 01:37; corrected wording"
+    },
+    {
+      "section": "bridge",
+      "start": 99.0,
+      "end": 100.55,
+      "text": "Heartbeat",
+      "preset": "BRIDGE_DECLARATION",
+      "timingNote": "split from CapCut 01:39 caption"
+    },
+    {
+      "section": "bridge",
+      "start": 100.0,
+      "end": 101.55,
+      "text": "Concrete",
+      "preset": "BRIDGE_DECLARATION",
+      "timingNote": "editorial split inside CapCut 01:39 caption"
+    },
+    {
+      "section": "bridge",
+      "start": 101.0,
+      "end": 105.5,
+      "text": "Lost inside the city",
+      "preset": "BETWEEN_WAVES_SKY",
+      "timingNote": "editorial split inside CapCut 01:39 caption"
+    },
+    {
+      "section": "final_chorus",
+      "start": 105.0,
+      "end": 106.75,
+      "text": "Neon therapy",
+      "preset": "HERO_PARADISE",
+      "timingNote": "split from CapCut 01:45 caption"
+    },
+    {
+      "section": "final_chorus",
+      "start": 106.2,
+      "end": 109.55,
+      "text": "I let the night consume me",
+      "preset": "CHORUS_FORWARD",
+      "timingNote": "editorial split inside CapCut 01:45 caption"
+    },
+    {
+      "section": "final_chorus",
+      "start": 109.0,
+      "end": 111.55,
+      "text": "Every lonely avenue",
+      "preset": "HORIZON_TRAVEL",
+      "timingNote": "CapCut 01:49"
+    },
+    {
+      "section": "final_chorus",
+      "start": 111.0,
+      "end": 114.55,
+      "text": "Feels like temporary clarity",
+      "preset": "CHORUS_SOFT",
+      "timingNote": "CapCut 01:51"
+    },
+    {
+      "section": "final_chorus",
+      "start": 114.0,
+      "end": 115.75,
+      "text": "Neon therapy",
+      "preset": "HERO_ECHO",
+      "timingNote": "split from CapCut 01:54 caption"
+    },
+    {
+      "section": "final_chorus",
+      "start": 115.2,
+      "end": 117.55,
+      "text": "Restless soul, no gravity",
+      "preset": "HORIZON_WIDE",
+      "timingNote": "editorial split; corrected from misheard CapCut 01:54"
+    },
+    {
+      "section": "final_chorus",
+      "start": 117.0,
+      "end": 119.55,
+      "text": "City lights and dopamine",
+      "preset": "HORIZON_GLOW",
+      "timingNote": "CapCut 01:57"
+    },
+    {
+      "section": "final_chorus",
+      "start": 119.0,
+      "end": 123.5,
+      "text": "Turning pain into energy",
+      "preset": "CHORUS_BUILD",
+      "timingNote": "CapCut 01:59; removed CapCut-added 'yeah yeah'"
+    }
+  ]
+}
