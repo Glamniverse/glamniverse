@@ -138,7 +138,7 @@ test('Lyrics control leaves media untouched; session reset defaults ON and one p
   h.registered[6].select();assert.equal(h.game.getDebugState().lyricsEnabled,false);assert.equal(h.game.getDebugState().activeLyrics,0)
   assert.equal(h.media.currentTime,110);assert.equal(h.media.paused,false)
   h.registered[6].select();h.tick();assert.equal(h.game.getDebugState().activeLyrics,1)
-  for(let i=0;i<5;i++){h.game.xrHooks.onExit();h.enter();assert.equal(h.registered.length,7);assert.equal(h.game.getDebugState().lyricsEnabled,true);assert.equal(h.game.getDebugState().activeLyrics,0)}
+  for(let i=0;i<5;i++){h.game.xrHooks.onExit();h.enter();assert.equal(h.registered.length,8);assert.equal(h.game.getDebugState().lyricsEnabled,true);assert.equal(h.game.getDebugState().activeLyrics,0)}
   assert.equal(h.dogLoads(),1);assert.equal(h.audioCount(),1)
   assert.equal(h.game.getDebugState().companionCount,1)
   assert.equal(h.game.scene.getObjectsByProperty('name','SkyLoft_SpatialLyrics').length,1)
@@ -160,7 +160,9 @@ test('headset interruption freezes lyrics and explicit Play resumes; transitions
 })
 test('seven controls do not overlap, remain above table and utility rays invoke only intended action',()=>{
   const h=world();h.enter();h.game.scene.updateMatrixWorld(true)
-  const boxes=h.registered.map(r=>new THREE.Box3().setFromObject(r.object))
+  const controls=h.registered.filter(r=>r.object.name!=='SkyLoft_Bichon_Pet')
+  assert.equal(controls.length,7)
+  const boxes=controls.map(r=>new THREE.Box3().setFromObject(r.object))
   for(let i=0;i<boxes.length;i++){
     assert.ok(boxes[i].min.y>.585+.16)
     for(let j=i+1;j<boxes.length;j++)assert.equal(boxes[i].intersectsBox(boxes[j]),false)
@@ -208,4 +210,26 @@ test('M4.1 datasets fit existing presets and switch through one engine without s
     l.update({songId:id,seconds:10,playing:true},{...songState,requestedReality:'switching'},head,front);assert.equal(l.stats().activeLyrics,0)
   }
   l.dispose();assert.equal(releases,4);assert.equal(root.children.length,0)
+})
+
+
+test('pet state and one target survive reality switches; XR exit removes target and re-entry reuses dog',async()=>{
+ const h=world();h.enter();h.tick()
+ const dog=h.game.scene.getObjectByName('SkyLoft_Bichon'),origin=h.origin.position.clone()
+ h.registered[7].select();h.tick()
+ assert.equal(h.game.getDebugState().companionState,'PET_REACTION')
+ for(const i of [1,2,0]){
+   h.registered[i].select();h.loaded();await settle();h.tick(.1)
+   assert.equal(h.game.scene.getObjectByName('SkyLoft_Bichon'),dog)
+   assert.equal(h.game.getDebugState().companionState,'PET_REACTION')
+   assert.equal(h.game.getDebugState().companionPetTargets,1)
+   assert.equal(h.game.getDebugState().companionCount,1)
+   assert.deepEqual(h.origin.position,origin)
+ }
+ h.session.visibilityState='hidden';h.tick();assert.equal(h.game.getDebugState().companionState,'IDLE')
+ h.game.xrHooks.onExit();assert.equal(h.registered.length,0)
+ h.session.visibilityState='visible';h.enter();h.tick();h.registered[7].select();h.tick()
+ assert.equal(h.game.getDebugState().companionState,'PET_REACTION')
+ assert.equal(h.dogLoads(),1);assert.equal(h.audioCount(),1);assert.equal(h.registered.length,8)
+ h.game.xrHooks.dispose();assert.equal(h.registered.length,0)
 })

@@ -37,7 +37,7 @@ test('deterministic wander, approach, happy, departure stay inside clear floor a
   assert.ok(m.position.z>=C.bounds.minZ&&m.position.z<=C.bounds.maxZ)
   assert.ok(Math.hypot(m.position.x,m.position.z)>=C.stopDistance-.003)
  }
- assert.deepEqual([...seen].sort(),[...COMPANION_STATES].sort())
+ assert.deepEqual([...seen].sort(),COMPANION_STATES.filter(s=>s!=='PET_REACTION').sort())
  m.reset();assert.equal(m.state,'IDLE');assert.deepEqual([m.position.x,m.position.z],C.anchors[0])
  const p={...m.position};m.dispose();m.update(.05,head);assert.deepEqual(m.position,p)
 })
@@ -91,4 +91,73 @@ test('actual Sky Loft XR entry/exit/re-entry reuses one dog and follows room-loc
  game.xrHooks.onExit();game.xrHooks.onEnter(state);game.update(20000,frame);game.update(20016,frame)
  assert.equal(requests,1);assert.equal(game.getDebugState().companionCount,1)
  game.xrHooks.dispose();assert.equal(game.getDebugState().companionCount,0)
+})
+
+
+test('pet interrupts calmly, cooldown blocks repeats, then safe approach tracks relocated user',()=>{
+ const m=createCompanionMotion(),head={x:0,z:0}
+ assert.ok(m.pet(head));assert.equal(m.state,'PET_REACTION');assert.equal(m.moving,false)
+ const initial={...m.position}
+ for(let i=0;i<59;i++){assert.equal(m.pet(head),false);m.update(.05,head)}
+ assert.deepEqual(m.position,initial)
+ assert.ok(Math.abs(m.yaw-Math.atan2(m.position.x,m.position.z))<1e-8)
+ head.x=.6;head.z=.3
+ for(let i=0;i<1000&&m.state!=='HAPPY';i++)m.update(.05,head)
+ assert.equal(m.state,'HAPPY');assert.ok(Math.abs(Math.hypot(m.position.x-head.x,m.position.z-head.z)-C.stopDistance)<.04)
+ assert.ok(m.pet(head));m.cancelPet();assert.equal(m.state,'IDLE')
+ m.reset();assert.ok(m.pet({x:20,z:20}))
+ for(let i=0;i<65;i++)m.update(.05,{x:20,z:20})
+ assert.equal(m.state,'IDLE');assert.deepEqual(m.position,initial)
+})
+
+async function petHarness(blockers=[]){
+ const root=new THREE.Group(),targets=[];let ready,greetings=0,activated=0
+ const c=createCompanion(root,{load(p,ok){ready=ok}},()=>greetings++)
+ const interaction={addTarget(object,select,options){const t={object,select,options};targets.push(t);return()=>{const i=targets.indexOf(t);if(i>=0)targets.splice(i,1)}}}
+ c.load();const g=await asset();ready(g)
+ const head=new THREE.Vector3(0,1.6,0)
+ c.bind(interaction,()=>true,blockers,()=>activated++);c.update(0,head,true);root.updateMatrixWorld(true)
+ return {c,g,root,head,targets,interaction,greetings:()=>greetings,activated:()=>activated}
+}
+
+test('one forgiving ray target, furniture/UI occlusion, select cooldown and no held-trigger polling',async()=>{
+ const block=new THREE.Mesh(new THREE.BoxGeometry(1,1,.1),new THREE.MeshBasicMaterial())
+ const h=await petHarness([block]),t=h.targets[0],center=t.object.getWorldPosition(new THREE.Vector3())
+ const ray=new THREE.Raycaster(center.clone().add(new THREE.Vector3(0,0,2)),new THREE.Vector3(0,0,-1),0,5)
+ block.position.set(20,20,20)
+ assert.equal(ray.intersectObject(t.object,false).length,1)
+ block.position.copy(center).add(new THREE.Vector3(0,0,1))
+ assert.equal(ray.intersectObject(t.object,false).length,0)
+ block.position.set(20,20,20)
+ t.select();assert.equal(h.c.stats().companionState,'PET_REACTION')
+ for(let i=0;i<10;i++)t.select()
+ assert.equal(h.c.stats().companionPets,1)
+ for(let i=1;i<180;i++)h.c.update(i*20,h.head,true)
+ assert.equal(h.c.stats().companionPets,1);assert.equal(h.greetings(),1)
+ t.select();h.c.update(3600,h.head,true)
+ assert.equal(h.c.stats().companionPets,2);assert.equal(h.greetings(),2)
+ assert.equal(h.c.stats().companionCount,1);assert.ok(h.activated()>0)
+ h.c.bind(h.interaction,()=>true,[],()=>{});assert.equal(h.targets.length,1)
+ h.c.reset();assert.equal(h.targets.length,0);assert.equal(t.options.enabled(),false)
+ h.c.dispose();block.geometry.dispose();block.material.dispose()
+})
+
+test('real tail overlay is bounded and restored on interruption; approved skin and HappyHop stay healthy',async()=>{
+ const h=await petHarness(),tail=h.g.scene.getObjectByName('tail_0'),q=new THREE.Quaternion()
+ h.targets[0].select()
+ let maximum=0
+ // Sample full pet cycles, stripping the overlay on interruption to measure its exact contribution.
+ for(let sample=1;sample<=8;sample++){
+   h.c.reset();h.c.bind(h.interaction,()=>true);h.c.update(0,h.head,true);h.targets[0].select()
+   for(let i=1;i<=sample*15;i++)h.c.update(i*20,h.head,true)
+   q.copy(tail.quaternion);h.root.updateMatrixWorld(true)
+   const bounds=new THREE.Box3().setFromObject(h.g.scene,true)
+   assert.ok(bounds.min.y>-.005);assert.ok(bounds.max.y<.47)
+   h.c.update(sample*300+1,null,false)
+   maximum=Math.max(maximum,q.angleTo(tail.quaternion))
+   assert.ok(q.angleTo(tail.quaternion)<=.160001)
+   q.copy(tail.quaternion);h.c.update(sample*300+2,null,false);assert.ok(q.angleTo(tail.quaternion)<1e-7)
+   assert.equal(h.c.stats().companionState,'IDLE')
+ }
+ assert.ok(maximum>.06);h.c.dispose();assert.equal(h.targets.length,0)
 })

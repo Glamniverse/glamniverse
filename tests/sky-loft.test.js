@@ -86,7 +86,7 @@ test('invalid pose / pending XR / hidden session cannot select; recovery is clea
 })
 test('Back, interrupted exit, repeated sessions and idempotent disposal unregister all targets',()=>{
   const h=harness()
-  for(let i=0;i<10;i++){h.enter();h.game.xrHooks.onEnter(h.state);h.tick();assert.equal(h.registered.length,7)
+  for(let i=0;i<10;i++){h.enter();h.game.xrHooks.onEnter(h.state);h.tick();assert.equal(h.registered.length,8)
     h.registered[3].select();h.game.xrHooks.onRequestExit();assert.equal(h.registered.length,0)
     h.game.xrHooks.onExit();assert.equal(h.game.getDebugState().placed,false)}
   assert.equal(h.backs(),10)
@@ -113,7 +113,7 @@ test('successful texture is sRGB, no mipmaps, and clears on disposal',()=>{
 test('geometry budget is bounded; no transparent materials, shadows or frame animation',()=>{
   const h=harness();let calls=0,triangles=0,textures=new Set(),lights=0
   h.game.scene.traverse(o=>{
-    if(o.isMesh){calls++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3*(o.isInstancedMesh?o.count:1)
+    if(o.isMesh&&o.material.visible){calls++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3*(o.isInstancedMesh?o.count:1)
       if(o.parent.name!=='SkyLoft_SpatialLyrics')assert.equal(o.material.transparent,false);if(o.material.map)textures.add(o.material.map)}
     if(o.isLight){lights++;assert.ok(!o.castShadow)}
   })
@@ -219,7 +219,7 @@ test('exploration selector preserves song rays and resets movement/rig on XR re-
   const h=harness()
   const left={connected:true,controller:{visible:true},source:{handedness:'left',gamepad:{mapping:'xr-standard',axes:[0,0,0,0]}}}
   h.state.interaction.controllers=[left];h.enter()
-  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,7)
+  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,8)
   h.registered[4].select();assert.equal(h.game.getDebugState().movement,'slow');h.tick(16)
   left.source.gamepad.axes[2]=1
   for(let i=2;i<65;i++)h.tick(i*16)
@@ -229,7 +229,7 @@ test('exploration selector preserves song rays and resets movement/rig on XR re-
   const x=h.state.origin.position.x;h.tick(2000);assert.equal(h.state.origin.position.x,x)
   h.state.session.visibilityState='visible';h.tick(2016);h.tick(2032);assert.equal(h.state.origin.position.x,x)
   h.game.xrHooks.onExit();assert.equal(h.state.origin.position.x,0);h.enter()
-  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,7)
+  assert.equal(h.game.getDebugState().movement,'stationary');assert.equal(h.registered.length,8)
   h.game.xrHooks.dispose();assert.equal(h.registered.length,0)
 })
 
@@ -256,7 +256,7 @@ test('raised selector clears actual tabletop; all seven controls ray-hit and Bac
   const ray=new THREE.Raycaster();ray.far=5
   for(const height of [.9,1.6,2])for(const x of [-.3,0,.3]){
     ray.ray.origin.set(x,height,0)
-    for(const entry of h.registered){
+    for(const entry of h.registered.filter(e=>e.object.name!=='SkyLoft_Bichon_Pet')){
       const point=entry.object.getWorldPosition(new THREE.Vector3());point.x+=.02
       ray.ray.direction.copy(point.sub(ray.ray.origin).normalize())
       const hits=ray.intersectObjects([...solids,...h.registered.map(e=>e.object)],false)

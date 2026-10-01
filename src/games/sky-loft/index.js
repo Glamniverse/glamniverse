@@ -18,6 +18,8 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
   camera.position.set(0,CONFIG.virtualEyeHeight,0)
   const place = new THREE.Group(); scene.add(place)
   const loft = createLoft(place), environment = createEnvironment(place,environmentLoader)
+  // Static loft batches also occlude the companion ray target; geometry stays unchanged.
+  const petOccluders=place.children.filter(o=>o.isInstancedMesh)
   const visitors = createRealityVisitors(place)
   const lyrics = createSpatialLyrics(place,lyricsOptions)
   const bark=createBarkAudio(),exploration=createExploration(place)
@@ -26,6 +28,7 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
   let xr=null,disposed=false,placed=false
   const selector=createSelector(menuAnchor,id=>{bark.activate();lyrics.hide();lyrics.prepare(REALITIES[id]);reality.select(id);refreshControls()},back,mode=>{bark.activate();exploration.setMode(mode)},()=>{reality.togglePlayback();refreshControls()},()=>{lyrics.toggle();refreshControls()})
   lyrics.setOccluder(selector.group)
+  petOccluders.push(...selector.group.children.filter(o=>o.isMesh))
   const music=createLoftAudio(audioFactory(),message=>selector.setPlayback(message))
   const reality=createRealityEngine({environment,loft,visitors,music,onSelect:song=>selector.select(song),notify:message=>selector.setPlayback(message)})
   // Reuse playback snapshots; the lyric renderer only animates occupied pool slots.
@@ -80,7 +83,7 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
     xrHooks:{
       stationary:true,ownsAudio:true,customUI:true,
       onEnter(state){
-        unbind();xr=state;placed=false;exploration.bind(state);bark.activate();companion.load();selector.bind(state.interaction,enabled)
+        unbind();xr=state;placed=false;exploration.bind(state);bark.activate();companion.load();selector.bind(state.interaction,enabled);companion.bind(state.interaction,enabled,petOccluders,()=>bark.activate())
         onVisibility=()=>{if(state.session.visibilityState!=='visible'){reality.pause();bark.pause();exploration.pause()}}
         state.session.addEventListener('visibilitychange',onVisibility)
       },
