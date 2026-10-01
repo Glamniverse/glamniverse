@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { createAffection } from './companion-affection.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { COMPANION_SETTINGS as C, createCompanionMotion } from './companion-motion.js'
 
@@ -16,7 +17,7 @@ function release(model){
 }
 export function createCompanion(parent,loader=new GLTFLoader(),onGreeting=()=>{}) {
   const group=new THREE.Group();group.name='SkyLoft_Bichon';group.visible=false;parent.add(group)
-  const motor=createCompanionMotion(),localHead=new THREE.Vector3(),dogWorld=new THREE.Vector3()
+  const affection=createAffection(),motor=createCompanionMotion(),localHead=new THREE.Vector3(),dogWorld=new THREE.Vector3()
   let disposed=false,requested=false,model=null,mixer=null,last=null,current=null,previousState=null,error=null,triangles=0,draws=0
   const actions={}
   // One invisible, forgiving target; no raycasts against the 23k-triangle skin.
@@ -43,7 +44,7 @@ export function createCompanion(parent,loader=new GLTFLoader(),onGreeting=()=>{}
     if(current)current.fadeOut(.18)
     current=next
   }
-  const reset=()=>{unbind();motor.reset();last=null;previousState=null;group.visible=false;mixer?.stopAllAction();current=null}
+  const reset=()=>{unbind();affection.reset();motor.reset();last=null;previousState=null;group.visible=false;mixer?.stopAllAction();current=null}
   return {
     bind(interaction,enabled,blockers=[],activate=()=>{}){
       unbind();occluders=blockers
@@ -72,7 +73,7 @@ export function createCompanion(parent,loader=new GLTFLoader(),onGreeting=()=>{}
     getWorldPosition(out){group.getWorldPosition(out);out.y+=.3;return Boolean(model&&group.visible)},
     update(time,headWorld,enabled){
       if(disposed)return
-      if(!enabled||!model||!headWorld||!Number.isFinite(time)){group.visible=false;ready=false;last=null;restoreTail();motor.cancelPet();previousState=null;return}
+      if(!enabled||!model||!headWorld||!Number.isFinite(time)){group.visible=false;ready=false;last=null;restoreTail();motor.cancelPet();affection.cancel();previousState=null;return}
       ready=true;restoreTail()
       localHead.copy(headWorld);parent.worldToLocal(localHead)
       const dt=last===null?0:Math.min(.05,Math.max(0,(time-last)/1000));last=time
@@ -81,9 +82,10 @@ export function createCompanion(parent,loader=new GLTFLoader(),onGreeting=()=>{}
       let turn=motor.yaw-group.rotation.y;turn=Math.atan2(Math.sin(turn),Math.cos(turn))
       group.rotation.y+=turn*Math.min(1,dt*5)
       const happy=motor.state==='HAPPY'||motor.state==='PET_REACTION'
-      if(happy&&previousState!==motor.state){if(current===actions.HappyHop)current.reset().play();else animate('HappyHop');group.getWorldPosition(dogWorld);dogWorld.y+=.3;onGreeting(time/1000,dogWorld)}
+      if(happy&&previousState!==motor.state){if(current===actions.HappyHop)current.reset().play();else animate('HappyHop');group.getWorldPosition(dogWorld);dogWorld.y+=.3;onGreeting(time/1000,dogWorld,motor.state);if(motor.state==='PET_REACTION')affection.pet()}
       else if(!happy)animate(motor.moving?'Trot':'Idle')
       else if(current===actions.HappyHop&&current.time>=current.getClip().duration)animate('Idle')
+      if(affection.update(dt,localHead,motor.position,motor.state==='PET_REACTION')){group.getWorldPosition(dogWorld);dogWorld.y+=.3;onGreeting(time/1000,dogWorld,'whimper')}
       previousState=motor.state;mixer.update(dt)
       if(tail&&motor.state==='PET_REACTION'){
         const t=motor.petElapsed,envelope=Math.min(1,t/.3,(C.petDuration-t)/.5)

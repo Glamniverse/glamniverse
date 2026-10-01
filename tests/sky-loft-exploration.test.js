@@ -17,7 +17,7 @@ function audioHarness(){
  return {audio,ctx,sources,panners,gains}
 }
 test('bark stays completely silent with missing asset, blocked activation or failed fetch',async()=>{
- let contexts=0;const a=createBarkAudio({contextFactory(){contexts++;throw Error('blocked')}})
+ let contexts=0;const a=createBarkAudio({config:{...BARK,src:null,whimperSrc:null},contextFactory(){contexts++;throw Error('blocked')}})
  a.activate();assert.equal(contexts,0);assert.equal(a.greet(0,{x:0,y:0,z:0}),false);a.dispose()
  const b=createBarkAudio({config:{...BARK,src:'/missing'},contextFactory(){throw Error('blocked')}});b.activate();b.dispose()
  const h=audioHarness();h.ctx.resume=()=>Promise.reject(Error('denied'));h.audio.activate();await flush();h.ctx.state='suspended';assert.equal(h.audio.greet(0,{x:0,y:0,z:0}),false);h.audio.dispose()
@@ -107,4 +107,73 @@ test('room rotation uses loft-local boundaries, and rebind restores rig and stat
  h.motion.setMode('slow');h.tick();h.left.source.gamepad.axes[3]=-1;h.tick(600)
  const local=h.place.worldToLocal(h.origin.position.clone());assert.ok(local.z>-2.04);assert.ok(local.z<-1.9)
  h.motion.reset();assert.equal(h.origin.position.x,0);assert.equal(h.origin.position.z,0);assert.ok(Math.abs(h.origin.rotation.y-Math.PI/2)<1e-9);assert.equal(h.motion.mode,'stationary')
+})
+
+
+import {AFFECTION,createAffection} from '../src/games/sky-loft/companion-affection.js'
+test('departure requires completed close affection and user travel, once per session with global cooldown',()=>{
+ const a=createAffection(),head={x:0,z:0},dog={x:1.05,z:0}
+ const move=()=>{let count=0;for(let i=0;i<50;i++){head.x-=.05;if(a.update(.05,head,dog,false))count++}return count}
+ assert.equal(move(),0) // no PET
+ a.reset();head.x=0;a.pet();a.update(.05,head,dog,true)
+ head.x=-.1;assert.equal(a.update(.05,head,dog,true),false)
+ dog.x=4;assert.equal(a.update(.05,head,dog,false),false) // dog departed, user did not
+ dog.x=1.05;head.x=0;a.reset();a.pet();a.update(.05,head,dog,true)
+ for(let i=0;i<65;i++)assert.equal(a.update(.05,head,dog,i<60),false)
+ assert.equal(move(),1);assert.equal(move(),0)
+ // A fresh session inside the long cooldown cannot vocalize again.
+ head.x=0;a.cancel();a.pet();a.update(.05,head,dog,true);a.update(.05,head,dog,false)
+ assert.equal(move(),0)
+ for(let i=0;i<800;i++)a.update(.05,head,dog,false)
+ head.x=0;a.cancel();a.pet();a.update(.05,head,dog,true);a.update(.05,head,dog,false)
+ assert.equal(move(),1);assert.equal(AFFECTION.cooldown,36)
+})
+test('stationary reality changes, distant PET, reset, interruption, stale affection and teleports never whimper',()=>{
+ const head={x:0,z:0},dog={x:1.05,z:0}
+ for(const mode of ['reality','reset','pause','teleport','expired','distant']){
+  const a=createAffection();head.x=0;dog.x=mode==='distant'?4:1.05;a.pet();a.update(.05,head,dog,true)
+  if(mode==='reset')a.reset()
+  if(mode==='pause')a.cancel()
+  if(mode==='teleport'){head.x=-3;assert.equal(a.update(.05,head,dog,false),false)}
+  if(mode==='expired')for(let i=0;i<1300;i++)assert.equal(a.update(.05,head,dog,false),false)
+  for(let i=0;i<100;i++){
+   if(mode!=='reality')head.x-=.05
+   assert.equal(a.update(.05,head,dog,false),false,mode)
+  }
+ }
+})
+test('two recordings share one context/voice; whimper is softer, cooldown-limited and reset/disposed safely',async()=>{
+ const h=audioHarness(),p={x:1,y:.3,z:0};h.audio.activate();h.audio.activate();await flush()
+ assert.equal(h.audio.greet(0,p),true)
+ assert.equal(h.audio.whimper(1,p),false);assert.equal(h.sources.length,1)
+ h.sources[0].onended()
+ assert.equal(h.audio.whimper(38,p),true);assert.equal(h.gains[1].gain.value,.075)
+ assert.equal(h.audio.greet(40,p),false);assert.equal(h.sources.length,2)
+ h.sources[1].onended();assert.equal(h.audio.whimper(45,p),false)
+ assert.equal(h.audio.whimper(75,p),true);h.audio.reset();assert.equal(h.sources[2].stops,1)
+ h.audio.activate();await flush();assert.equal(h.audio.greet(0,p),true)
+ h.audio.dispose();h.audio.dispose();assert.equal(h.ctx.closed,1)
+})
+test('PET -> completed interaction -> player departure routes bark/whimper through the same hook; exit resets eligibility',async()=>{
+ const h=audioHarness();h.audio.activate();await flush()
+ let ready,select;const kinds=[],root=new THREE.Group()
+ const c=createCompanion(root,{load(p,ok){ready=ok}},(time,p,kind)=>{kinds.push(kind);kind==='whimper'?h.audio.whimper(time,p):h.audio.greet(time,p)})
+ c.load();ready({scene:new THREE.Group(),animations:['Idle','Trot','HappyHop'].map(n=>new THREE.AnimationClip(n,1,[]))})
+ const interaction={addTarget(o,s){select=s;return()=>{}}},head=new THREE.Vector3(2.45,1.6,1.05)
+ c.bind(interaction,()=>true);c.update(0,head,true);select();let time=0
+ for(let i=0;i<65;i++){time+=50;c.update(time,head,true)}
+ assert.deepEqual(kinds,['PET_REACTION']);assert.equal(h.sources.length,1);h.sources[0].onended()
+ for(let i=0;i<45;i++){time+=50;head.x-=.05;c.update(time,head,true)}
+ assert.equal(kinds.filter(k=>k==='whimper').length,1);assert.equal(h.sources.length,2)
+ c.reset();h.audio.reset();c.bind(interaction,()=>true)
+ for(let i=0;i<50;i++){time+=50;head.x-=.02;c.update(time,head,true)}
+ assert.equal(kinds.filter(k=>k==='whimper').length,1)
+ c.dispose();h.audio.dispose()
+})
+
+
+test('leaving during PET does not produce a delayed whimper after PET completes',()=>{
+ const a=createAffection(),head={x:0,z:0},dog={x:1.05,z:0};a.pet()
+ for(let i=0;i<50;i++){head.x-=.05;assert.equal(a.update(.05,head,dog,true),false)}
+ for(let i=0;i<100;i++)assert.equal(a.update(.05,head,dog,false),false)
 })

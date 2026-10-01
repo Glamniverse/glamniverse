@@ -23,7 +23,7 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
   const visitors = createRealityVisitors(place)
   const lyrics = createSpatialLyrics(place,lyricsOptions)
   const bark=createBarkAudio(),exploration=createExploration(place)
-  const companion = createCompanion(place,companionLoader,(time,position)=>bark.greet(time,position))
+  const companion = createCompanion(place,companionLoader,(time,position,kind)=>kind==='whimper'?bark.whimper(time,position):bark.greet(time,position))
   const menuAnchor = new THREE.Group(); scene.add(menuAnchor); menuAnchor.position.y=CONFIG.virtualEyeHeight
   let xr=null,disposed=false,placed=false
   const selector=createSelector(menuAnchor,id=>{bark.activate();lyrics.hide();lyrics.prepare(REALITIES[id]);reality.select(id);refreshControls()},back,mode=>{bark.activate();exploration.setMode(mode)},()=>{reality.togglePlayback();refreshControls()},()=>{lyrics.toggle();refreshControls()})
