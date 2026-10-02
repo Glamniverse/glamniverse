@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { visitorPosition } from './visitors.js'
+import { createButterflyCuriosity } from './butterfly-curiosity.js'
 
-// Four pooled butterflies, exterior routes only. No targets, collision, alpha or textures.
+// Four pooled butterflies; original distant routes plus XR curiosity. No ray targets or new graphics.
 export const BUTTERFLIES=Object.freeze({
   count:4,cycle:32,flight:27,offsets:[0,5,10,15],
   colors:[0x67dfff,0xd799ff,0xffa4cf,0x87f4d7],
@@ -38,25 +39,27 @@ export function createButterflies(parent){
   wings.frustumCulled=false;bodies.frustumCulled=false;group.add(wings,bodies)
   for(let i=0;i<BUTTERFLIES.count;i++){wings.setColorAt(i*2,new THREE.Color(BUTTERFLIES.colors[i]));wings.setColorAt(i*2+1,new THREE.Color(BUTTERFLIES.colors[i]))}
   const object=new THREE.Object3D(),hinge=new THREE.Object3D(),matrix=new THREE.Matrix4(),pos=new THREE.Vector3(),next=new THREE.Vector3()
+  const curiosity=createButterflyCuriosity(parent),ambient=new THREE.Vector3()
   let elapsed=0,last=null,active=0,disposed=false
-  const reset=()=>{elapsed=0;last=null;active=0;group.visible=false;wings.count=0;bodies.count=0}
+  const reset=()=>{curiosity.reset();elapsed=0;last=null;active=0;group.visible=false;wings.count=0;bodies.count=0}
   reset()
   return {
     reset,
-    update(time,visible){
+    update(time,visible,input){
       if(disposed)return
-      if(!visible||!Number.isFinite(time)){last=null;group.visible=false;active=0;return}
+      if(!visible||!Number.isFinite(time)){curiosity.reset();last=null;group.visible=false;active=0;return}
       const dt=last===null?0:Math.min(.05,Math.max(0,(time-last)/1000));last=time;elapsed+=dt
-      active=0
+      active=0;curiosity.begin(dt,input)
       for(let i=0;i<BUTTERFLIES.count;i++){
         const phase=(elapsed+BUTTERFLIES.offsets[i])%BUTTERFLIES.cycle
-        if(phase>=BUTTERFLIES.flight)continue
-        const t=phase/BUTTERFLIES.flight,route=BUTTERFLIES.routes[i]
+        const t=Math.min(1,phase/BUTTERFLIES.flight),route=BUTTERFLIES.routes[i]
         visitorPosition(t,route,pos);visitorPosition(Math.min(1,t+.001),route,next)
-        object.position.copy(pos);object.position.y+=.15*Math.sin(elapsed*1.5+i)
-        object.position.x+=.12*Math.sin(elapsed*.8+i*2)
+        ambient.copy(pos);ambient.y+=.15*Math.sin(elapsed*1.5+i)
+        ambient.x+=.12*Math.sin(elapsed*.8+i*2)
+        const engaged=curiosity.step(i,ambient,phase,elapsed,dt,object.position)
+        if(phase>=BUTTERFLIES.flight&&!engaged)continue
         object.rotation.set(0,Math.atan2(-(next.x-pos.x),-(next.z-pos.z)),.1*Math.sin(elapsed+i))
-        const size=Math.min(1,phase/2,(BUTTERFLIES.flight-phase)/2)
+        const size=engaged?1:Math.min(1,phase/2,(BUTTERFLIES.flight-phase)/2)
         object.scale.setScalar(size);object.updateMatrix();bodies.setMatrixAt(active,object.matrix)
         const flap=.25+.8*Math.sin(elapsed*(7+i*.35)+i)
         for(let side=0;side<2;side++){
@@ -70,8 +73,8 @@ export function createButterflies(parent){
       wings.count=active*2;bodies.count=active;group.visible=active>0
       wings.instanceMatrix.needsUpdate=true;bodies.instanceMatrix.needsUpdate=true;wings.instanceColor.needsUpdate=true
     },
-    stats:()=>({butterflyPool:BUTTERFLIES.count,activeButterflies:active}),
-    dispose(){if(disposed)return;reset();disposed=true},
+    stats:()=>({butterflyPool:BUTTERFLIES.count,activeButterflies:active,...curiosity.stats()}),
+    dispose(){if(disposed)return;reset();curiosity.dispose();disposed=true},
   }
 }
 const colorComponents=BUTTERFLIES.colors.map(hex=>{const c=new THREE.Color(hex);return [c.r,c.g,c.b]})

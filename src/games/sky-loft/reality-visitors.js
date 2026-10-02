@@ -33,7 +33,7 @@ export function createRealityVisitors(parent){
       systems[id].system.apply?.(id);setVisibility(visibility);return true
     },
     setVisibility,
-    update(time,enabled){if(!disposed&&selected)systems[selected].system.update(time,enabled)},
+    update(time,enabled,input){if(!disposed&&selected)systems[selected].system.update(time,enabled,input)},
     reset(){for(const s of Object.values(systems))s.system.reset()},
     stats:()=>{
       const stats=selected?systems[selected].system.stats():{}

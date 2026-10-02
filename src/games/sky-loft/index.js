@@ -37,11 +37,12 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
   refreshControls()
   // Reused temporaries; only first valid XR pose anchors room/UI. Never moves camera.
   const head=new THREE.Vector3(),forward=new THREE.Vector3(),q=new THREE.Quaternion(),originQ=new THREE.Quaternion(),dogPosition=new THREE.Vector3()
+  const visitorInput={head,controllers:null}
   const enabled=()=>!disposed&&placed&&xr&&!xr.attaching&&!xr.cancelled&&!xr.ended&&xr.session.visibilityState==='visible'
   let onVisibility = null
   const unbind=()=>{
     if(xr && onVisibility) xr.session.removeEventListener('visibilitychange',onVisibility)
-    onVisibility=null;selector.unbind();lyrics.reset();music.release();reality.reset();visitors.reset();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');xr=null;placed=false
+    onVisibility=null;visitorInput.controllers=null;selector.unbind();lyrics.reset();music.release();reality.reset();visitors.reset();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');xr=null;placed=false
   }
   return {
     scene,camera, getPlaybackClock: () => ({...music.getClock(),...reality.stats()}),
@@ -49,18 +50,19 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
     update(time,frame) {
       if(disposed)return
       reality.update(time, Boolean(frame && enabled()))
-      visitors.update(time, Boolean(frame && enabled()))
       refreshControls()
-      if(disposed||!xr||!frame||xr.attaching||xr.cancelled||xr.ended||xr.session.visibilityState!=='visible'){companion.update(time,null,false);exploration.pause();bark.pause();return}
+      if(disposed||!xr||!frame||xr.attaching||xr.cancelled||xr.ended||xr.session.visibilityState!=='visible'){visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
       const reference=xr.renderer.xr.getReferenceSpace()
-      if(!reference){companion.update(time,null,false);exploration.pause();bark.pause();return}
+      if(!reference){visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
       const pose=frame.getViewerPose(reference)
-      if(!pose){companion.update(time,null,false);exploration.pause();bark.pause();return}
+      if(!pose){visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
       const p=pose.transform.position,r=pose.transform.orientation
       if(placed)exploration.update(time,pose,true)
       xr.origin.updateWorldMatrix(true,false)
       head.set(p.x,p.y,p.z).applyMatrix4(xr.origin.matrixWorld)
       if(placed){
+        visitorInput.controllers=xr.interaction?.controllers
+        visitors.update(time,true,visitorInput)
         xr.origin.getWorldQuaternion(originQ);q.set(r.x,r.y,r.z,r.w)
         forward.set(0,0,-1).applyQuaternion(q).applyQuaternion(originQ)
         lyrics.update(clockState,realityState,head,forward)
