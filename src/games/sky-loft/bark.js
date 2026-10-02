@@ -1,5 +1,5 @@
 // User-approved mono recordings, copied unchanged from Downloads. One shared voice/listener.
-export const BARK = Object.freeze({src:'/audio/sky-loft/bichon-greeting.ogg',whimperSrc:'/audio/sky-loft/bichon-whimper.ogg',whimperVolume:.075,whimperCooldown:36,expectedPath:'/audio/sky-loft/bichon-greeting.ogg',volume:.12,cooldown:12,refDistance:1,maxDistance:10,rolloff:1.5})
+export const BARK = Object.freeze({src:'/audio/sky-loft/bichon-greeting.ogg',whimperSrc:'/audio/sky-loft/bichon-whimper.ogg',whimperVolume:.075,whimperCooldown:36,expectedPath:'/audio/sky-loft/bichon-greeting.ogg',volume:.24,cooldown:12,refDistance:1,maxDistance:10,rolloff:1.5})
 export function createBarkAudio({config=BARK,contextFactory=()=>new (globalThis.AudioContext||globalThis.webkitAudioContext)(),fetchAudio=globalThis.fetch}={}){
  let ctx=null,buffer=null,whimperBuffer=null,voice=null,gain=null,panner=null,request=null,loading=false,disposed=false,epoch=0,lastGreeting=-Infinity,lastWhimper=-Infinity
  function stop(){if(voice){voice.onended=null;try{voice.stop()}catch{}voice.disconnect();gain?.disconnect();panner?.disconnect()}voice=null;gain=null;panner=null}

@@ -25,7 +25,7 @@ test('bark stays completely silent with missing asset, blocked activation or fai
 })
 test('greeting bark cooldown, one voice, spatial tracking, conservative gain and cleanup',async()=>{
  const h=audioHarness(),dog={x:2,y:.2,z:-1};h.audio.activate();await flush()
- assert.equal(h.audio.greet(0,dog),true);assert.equal(h.gains[0].gain.value,.12)
+ assert.equal(h.audio.greet(0,dog),true);assert.equal(h.gains[0].gain.value,.24)
  assert.equal(h.panners[0].positionX.value,2);assert.equal(h.panners[0].refDistance,1)
  assert.equal(h.audio.greet(1,dog),false);assert.equal(h.audio.greet(20,dog),false);assert.equal(h.sources.length,1)
  h.audio.update({x:1,y:1.6,z:0},{x:1,y:0,z:0},{x:3,y:.2,z:0})
