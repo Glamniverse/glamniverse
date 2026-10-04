@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { createMantaCuriosity } from './manta-curiosity.js'
 
 // Deterministic exterior-only flight paths, in the loft's anchored local space.
 export const VISITOR_PROFILE = Object.freeze({
@@ -37,17 +38,18 @@ export function createVisitors(parent) {
     group.add(new THREE.Mesh(shell,bodyMaterial),new THREE.LineLoop(edge,glowMaterial))
     parent.add(group);group.visible=false;return group
   })
-  const next=new THREE.Vector3()
+  const next=new THREE.Vector3(),ambient=new THREE.Vector3(),previous=new THREE.Vector3(),curiosity=createMantaCuriosity(parent)
   let disposed=false,enabled=true,elapsed=0,lastTime=null,active=0
-  const reset=()=>{elapsed=0;lastTime=null;active=0;pool.forEach(g=>{g.visible=false})}
+  const reset=()=>{curiosity.reset();bodyMaterial.emissiveIntensity=.55;elapsed=0;lastTime=null;active=0;pool.forEach(g=>{g.visible=false})}
   return {
     apply(profile){enabled=profile==='neon-mantas';reset()},
     reset,
-    update(time,visible) {
+    update(time,visible,input) {
       if(disposed)return
-      if(!visible||!Number.isFinite(time)){lastTime=null;pool.forEach(g=>{g.visible=false});active=0;return}
+      if(!visible||!Number.isFinite(time)){curiosity.reset();bodyMaterial.emissiveIntensity=.55;lastTime=null;pool.forEach(g=>{g.visible=false});active=0;return}
       const delta=lastTime===null?0:Math.min(.05,Math.max(0,(time-lastTime)/1000))
-      lastTime=time;elapsed+=delta;active=0
+      lastTime=time;elapsed+=delta;active=0;curiosity.begin(delta,input)
+      let response=0
       for(let i=0;i<pool.length;i++){
         const local=elapsed-VISITOR_PROFILE.offsets[i]
         const phase=local<0?-1:local%VISITOR_PROFILE.cycleSeconds
@@ -55,13 +57,18 @@ export function createVisitors(parent) {
         if(!g.visible)continue
         active++
         const t=phase/VISITOR_PROFILE.flightSeconds,route=VISITOR_PROFILE.routes[i]
-        visitorPosition(t,route,g.position);visitorPosition(Math.min(1,t+.001),route,next)
-        g.rotation.set(0,Math.atan2(-(next.x-g.position.x),-(next.z-g.position.z)),.08*Math.sin(elapsed*.7+i))
+        visitorPosition(t,route,ambient);visitorPosition(Math.min(1,t+.001),route,next)
+        previous.copy(g.position)
+        response=Math.max(response,curiosity.step(i,ambient,phase,delta,g.position))
+        g.rotation.set(0,Math.atan2(-(next.x-ambient.x),-(next.z-ambient.z)),.08*Math.sin(elapsed*.7+i))
+        if(input?.controllers&&delta>0&&g.position.distanceToSquared(previous)>1e-8)
+          g.rotation.y=Math.atan2(-(g.position.x-previous.x),-(g.position.z-previous.z))
         const scale=.9*Math.min(1,phase/3,(VISITOR_PROFILE.flightSeconds-phase)/3)
         g.scale.set(scale,scale*(1+.2*Math.sin(elapsed*1.8+i)),scale)
       }
+      bodyMaterial.emissiveIntensity=.55+.08*response
     },
-    stats:()=>({visitorPool:pool.length,activeVisitors:active}),
+    stats:()=>({visitorPool:pool.length,activeVisitors:active,...curiosity.stats()}),
     dispose(){if(disposed)return;reset();disposed=true},
     // Graphics remain attached for the existing shared scene-resource disposer.
   }

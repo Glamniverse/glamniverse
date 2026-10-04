@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { createJellyfishResonance } from './jellyfish-resonance.js'
 
 // Twelve permanent pooled inhabitants. All drift envelopes stay outside the real floor.
 export const JELLYFISH=Object.freeze({
@@ -43,20 +44,22 @@ export function createJellyfish(parent){
     tint.setHex([0xb5edff,0xb5c8ff,0x9affee][i%3])
     bells.setColorAt(i,tint);rims.setColorAt(i,tint);tendrils.setColorAt(i,tint)
   }
-  const o=new THREE.Object3D(),pos=new THREE.Vector3()
+  const o=new THREE.Object3D(),pos=new THREE.Vector3(),resonance=createJellyfishResonance(parent)
   let elapsed=0,last=null,active=0,disposed=false
-  const reset=()=>{elapsed=0;last=null;active=0;group.visible=false}
+  const reset=()=>{resonance.reset();elapsed=0;last=null;active=0;group.visible=false}
   reset()
   return {
     reset,
-    update(time,visible){
+    update(time,visible,input){
       if(disposed)return
-      if(!visible||!Number.isFinite(time)){last=null;active=0;group.visible=false;return}
-      elapsed+=last===null?0:Math.min(.05,Math.max(0,(time-last)/1000));last=time
+      if(!visible||!Number.isFinite(time)){resonance.reset();last=null;active=0;group.visible=false;return}
+      const dt=last===null?0:Math.min(.05,Math.max(0,(time-last)/1000));elapsed+=dt;last=time
+      resonance.begin(dt,input)
       group.visible=true;active=JELLYFISH.count
       for(let i=0;i<JELLYFISH.count;i++){
-        const phase=i*1.73,pulse=1+.065*Math.sin(elapsed*1.6+phase),scale=i<3?1.05:.65+(i%4)*.18
-        jellyfishPosition(elapsed,i,pos);o.position.copy(pos)
+        jellyfishPosition(elapsed,i,pos)
+        const response=resonance.step(i,pos,elapsed,dt,o.position)
+        const phase=i*1.73,pulse=1+(.065+.035*response)*Math.sin(elapsed*1.6+phase),scale=i<3?1.05:.65+(i%4)*.18
         o.rotation.set(.035*Math.sin(elapsed*.3+phase),elapsed*.035+phase,.06*Math.sin(elapsed*.35+phase))
         o.scale.set(scale*pulse,scale*(2-pulse),scale*pulse);o.updateMatrix();bells.setMatrixAt(i,o.matrix);rims.setMatrixAt(i,o.matrix)
         // Whole trailing skirt sways slowly; no per-tentacle CPU vertex deformation.
@@ -64,7 +67,7 @@ export function createJellyfish(parent){
       }
       for(const m of meshes)m.instanceMatrix.needsUpdate=true
     },
-    stats:()=>({jellyfishPool:JELLYFISH.count,activeJellyfish:active}),
+    stats:()=>({jellyfishPool:JELLYFISH.count,activeJellyfish:active,...resonance.stats()}),
     dispose(){if(disposed)return;reset();disposed=true},
   }
 }

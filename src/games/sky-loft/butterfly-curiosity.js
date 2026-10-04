@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { createFaunaPresence } from './fauna-presence.js'
 
 export const CURIOSITY = Object.freeze({radius:1.8,releaseRadius:2.1,fastSpeed:1.3,
   fastCooldown:1.5,followSpeed:.55,releaseSeconds:1.6,headClearance:.8})
@@ -9,30 +10,17 @@ const ease=t=>{t=THREE.MathUtils.clamp(t,0,1);return t*t*(3-2*t)}
 
 // Positions only; the existing two InstancedMeshes still own all rendering.
 export function createButterflyCuriosity(parent){
-  const hands=Array.from({length:2},()=>({position:new THREE.Vector3(),previous:new THREE.Vector3(),
-    world:new THREE.Vector3(),valid:false,tracked:false,blocked:0}))
+  const presence=createFaunaPresence(parent,CURIOSITY),{hands,head}=presence
   const states=perches.map(()=>({position:new THREE.Vector3(),ready:false,hand:-1,weight:0,recovering:false}))
-  const head=new THREE.Vector3(),target=new THREE.Vector3(),delta=new THREE.Vector3(),away=new THREE.Vector3()
+  const target=new THREE.Vector3(),delta=new THREE.Vector3(),away=new THREE.Vector3()
   let xr=false,disposed=false
-  function reset(){xr=false;for(const h of hands){h.valid=false;h.tracked=false;h.blocked=0}
+  function reset(){xr=false;presence.reset()
     for(const s of states){s.ready=false;s.hand=-1;s.weight=0;s.recovering=false}}
   return {
     reset,
     begin(dt,input){
       if(disposed)return
-      xr=Boolean(input?.head&&input?.controllers)
-      if(xr){head.copy(input.head);parent.worldToLocal(head)}
-      for(let i=0;i<2;i++){
-        const h=hands[i],entry=input?.controllers?.[i],controller=(entry?.grip?.visible?entry.grip:entry?.controller)
-        h.valid=false;h.blocked=Math.max(0,h.blocked-dt)
-        if(!xr||!entry?.connected||!entry.controller?.visible||!controller?.getWorldPosition){h.tracked=false;continue}
-        controller.updateWorldMatrix(true,false);controller.getWorldPosition(h.world)
-        if(!Number.isFinite(h.world.x+h.world.y+h.world.z)){h.tracked=false;continue}
-        if(h.tracked&&dt>0&&h.world.distanceTo(h.previous)/dt>CURIOSITY.fastSpeed)h.blocked=CURIOSITY.fastCooldown
-        h.previous.copy(h.world);h.tracked=true;h.position.copy(h.world);parent.worldToLocal(h.position)
-        h.valid=h.blocked===0&&h.position.distanceTo(head)>=.55
-      }
-      xr=xr&&(hands[0].tracked||hands[1].tracked)
+      presence.begin(dt,input);xr=presence.active
     },
     step(i,ambient,phase,elapsed,dt,out){
       const s=states[i]
