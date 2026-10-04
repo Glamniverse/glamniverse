@@ -35,6 +35,7 @@ export function createSpatialLyrics(parent,{load=(url,signal)=>fetch(url,{signal
     return {mesh,index:-1,anchor:new THREE.Vector3(),direction:new THREE.Vector3(),preset:null}
   })
   let enabled=true,disposed=false,song=null,data=null,atlas=null,version=0,status='unavailable',controller=null
+  let heroEpoch=0
   let occluder=null
   const menuBox=new THREE.Box3(),corner=new THREE.Vector3()
   const active=[],localHead=new THREE.Vector3(),localForward=new THREE.Vector3(),inverse=new THREE.Quaternion()
@@ -44,7 +45,7 @@ export function createSpatialLyrics(parent,{load=(url,signal)=>fetch(url,{signal
     if(disposed)return
     if(!reality.lyrics){clear();return} // Keep the one cached atlas across non-lyric realities.
     if(song===reality.id&&status!=='error')return
-    version++;controller?.abort();releaseData();song=reality.id;status=reality.lyrics?'loading':'unavailable'
+    heroEpoch++;version++;controller?.abort();releaseData();song=reality.id;status=reality.lyrics?'loading':'unavailable'
     if(!reality.lyrics)return
     const attempt=version,request=new AbortController();controller=request
     Promise.resolve().then(()=>load(reality.lyrics,request.signal)).then(result=>{
@@ -125,8 +126,15 @@ export function createSpatialLyrics(parent,{load=(url,signal)=>fetch(url,{signal
         s.mesh.material.opacity=Math.max(0,opacity);s.mesh.visible=true
       }
     },
+    getHeroTarget(){
+      if(disposed||!enabled||song!=='paradise'||status!=='ready')return null
+      for(const s of slots)if(s.index>=0&&s.mesh.visible&&s.mesh.material.opacity>=.3&&data.events[s.index].preset==='HERO_PARADISE'){
+        s.heroEpoch=heroEpoch;return s
+      }
+      return null
+    },
     hide:clear,
-    reset(){clear();enabled=true},
+    reset(){heroEpoch++;clear();enabled=true},
     stats(out={}){
       let count=0;for(const s of slots)if(s.mesh.visible)count++
       out.lyricsEnabled=enabled;out.lyricStatus=status;out.lyricSong=song;out.activeLyrics=count;out.lyricPool=slots.length;out.lyricAtlases=atlas?1:0

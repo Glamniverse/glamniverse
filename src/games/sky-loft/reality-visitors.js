@@ -33,6 +33,7 @@ export function createRealityVisitors(parent){
       systems[id].system.apply?.(id);setVisibility(visibility);return true
     },
     setVisibility,
+    heroPulse(){return !disposed&&selected==='jellyfish'&&visibility>0?systems.jellyfish.system.heroPulse():false},
     update(time,enabled,input){if(!disposed&&selected)systems[selected].system.update(time,enabled,input)},
     reset(){for(const s of Object.values(systems))s.system.reset()},
     stats:()=>{

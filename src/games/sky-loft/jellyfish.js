@@ -45,21 +45,24 @@ export function createJellyfish(parent){
     bells.setColorAt(i,tint);rims.setColorAt(i,tint);tendrils.setColorAt(i,tint)
   }
   const o=new THREE.Object3D(),pos=new THREE.Vector3(),resonance=createJellyfishResonance(parent)
-  let elapsed=0,last=null,active=0,disposed=false
-  const reset=()=>{resonance.reset();elapsed=0;last=null;active=0;group.visible=false}
+  let elapsed=0,last=null,active=0,disposed=false,waveAge=Infinity
+  const reset=()=>{waveAge=Infinity;resonance.reset();elapsed=0;last=null;active=0;group.visible=false}
   reset()
   return {
     reset,
+    heroPulse(){if(disposed||!group.visible||!active)return false;waveAge=0;return true},
     update(time,visible,input){
       if(disposed)return
-      if(!visible||!Number.isFinite(time)){resonance.reset();last=null;active=0;group.visible=false;return}
-      const dt=last===null?0:Math.min(.05,Math.max(0,(time-last)/1000));elapsed+=dt;last=time
+      if(!visible||!Number.isFinite(time)){waveAge=Infinity;resonance.reset();last=null;active=0;group.visible=false;return}
+      const dt=last===null?0:Math.min(.05,Math.max(0,(time-last)/1000));elapsed+=dt;waveAge+=dt;last=time
       resonance.begin(dt,input)
       group.visible=true;active=JELLYFISH.count
       for(let i=0;i<JELLYFISH.count;i++){
         jellyfishPosition(elapsed,i,pos)
         const response=resonance.step(i,pos,elapsed,dt,o.position)
-        const phase=i*1.73,pulse=1+(.065+.035*response)*Math.sin(elapsed*1.6+phase),scale=i<3?1.05:.65+(i%4)*.18
+        const waveTime=waveAge-i*.06
+        const wave=waveTime>=0&&waveTime<1.2?Math.sin(Math.PI*waveTime/1.2)**2:0
+        const phase=i*1.73,pulse=1+(.065+.035*response+.04*wave)*Math.sin(elapsed*1.6+phase),scale=i<3?1.05:.65+(i%4)*.18
         o.rotation.set(.035*Math.sin(elapsed*.3+phase),elapsed*.035+phase,.06*Math.sin(elapsed*.35+phase))
         o.scale.set(scale*pulse,scale*(2-pulse),scale*pulse);o.updateMatrix();bells.setMatrixAt(i,o.matrix);rims.setMatrixAt(i,o.matrix)
         // Whole trailing skirt sways slowly; no per-tentacle CPU vertex deformation.

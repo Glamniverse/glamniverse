@@ -10,6 +10,7 @@ import { createCompanion } from './companion.js'
 import { createExploration } from './exploration.js'
 import { createBarkAudio } from './bark.js'
 import { createSpatialLyrics } from './lyrics.js'
+import { createHeroInteraction } from './hero-interaction.js'
 
 // No renderer, requestSession, scheduler, controller listeners, or shared-site audio player here.
 export function createSkyLoft({ back, environmentLoader, companionLoader, lyricsOptions, audioFactory = () => new Audio() } = {}) {
@@ -29,6 +30,7 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
   const selector=createSelector(menuAnchor,id=>{bark.activate();lyrics.hide();lyrics.prepare(REALITIES[id]);reality.select(id);refreshControls()},back,mode=>{bark.activate();exploration.setMode(mode)},()=>{reality.togglePlayback();refreshControls()},()=>{lyrics.toggle();refreshControls()})
   lyrics.setOccluder(selector.group)
   petOccluders.push(...selector.group.children.filter(o=>o.isMesh))
+  const hero=createHeroInteraction(lyrics,[...petOccluders,place.getObjectByName('SkyLoft_Bichon_Pet')],()=>visitors.heroPulse())
   const music=createLoftAudio(audioFactory(),message=>selector.setPlayback(message))
   const reality=createRealityEngine({environment,loft,visitors,music,onSelect:song=>selector.select(song),notify:message=>selector.setPlayback(message)})
   // Reuse playback snapshots; the lyric renderer only animates occupied pool slots.
@@ -42,20 +44,21 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
   let onVisibility = null
   const unbind=()=>{
     if(xr && onVisibility) xr.session.removeEventListener('visibilitychange',onVisibility)
-    onVisibility=null;visitorInput.controllers=null;selector.unbind();lyrics.reset();music.release();reality.reset();visitors.reset();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');xr=null;placed=false
+    onVisibility=null;hero.reset();visitorInput.controllers=null;selector.unbind();lyrics.reset();music.release();reality.reset();visitors.reset();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');xr=null;placed=false
   }
   return {
     scene,camera, getPlaybackClock: () => ({...music.getClock(),...reality.stats()}),
     getDebugState:()=>({disposed,placed,movement:exploration.mode,...reality.stats(),...selector.stats(),...lyrics.stats(),...environment.stats(),...visitors.stats(),...companion.stats(),loftInstances:loft.instances}),
     update(time,frame) {
       if(disposed)return
+      hero.restore()
       reality.update(time, Boolean(frame && enabled()))
       refreshControls()
-      if(disposed||!xr||!frame||xr.attaching||xr.cancelled||xr.ended||xr.session.visibilityState!=='visible'){visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
+      if(disposed||!xr||!frame||xr.attaching||xr.cancelled||xr.ended||xr.session.visibilityState!=='visible'){hero.update(time,null);visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
       const reference=xr.renderer.xr.getReferenceSpace()
-      if(!reference){visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
+      if(!reference){hero.update(time,null);visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
       const pose=frame.getViewerPose(reference)
-      if(!pose){visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
+      if(!pose){hero.update(time,null);visitors.update(time,false);visitorInput.controllers=null;companion.update(time,null,false);exploration.pause();bark.pause();return}
       const p=pose.transform.position,r=pose.transform.orientation
       if(placed)exploration.update(time,pose,true)
       xr.origin.updateWorldMatrix(true,false)
@@ -67,6 +70,7 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
         forward.set(0,0,-1).applyQuaternion(q).applyQuaternion(originQ)
         lyrics.update(clockState,realityState,head,forward)
         companion.update(time,head,true)
+        hero.update(time,visitorInput.controllers)
         if(companion.getWorldPosition(dogPosition)){
           xr.origin.getWorldQuaternion(originQ);q.set(r.x,r.y,r.z,r.w)
           forward.set(0,0,-1).applyQuaternion(q).applyQuaternion(originQ)
@@ -89,12 +93,12 @@ export function createSkyLoft({ back, environmentLoader, companionLoader, lyrics
         onVisibility=()=>{if(state.session.visibilityState!=='visible'){reality.pause();bark.pause();exploration.pause()}}
         state.session.addEventListener('visibilitychange',onVisibility)
       },
-      onRequestExit(){lyrics.reset();music.release();reality.reset();selector.unbind();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');placed=false},
+      onRequestExit(){hero.reset();lyrics.reset();music.release();reality.reset();selector.unbind();companion.reset();bark.reset();exploration.reset();selector.setMovement('stationary');placed=false},
       onExit:unbind,
       suspend:unbind,
       dispose(){
         if(disposed)return
-        disposed=true;unbind();lyrics.dispose();reality.dispose();music.dispose();visitors.dispose();companion.dispose();bark.dispose();environment.dispose()
+        disposed=true;unbind();hero.dispose();lyrics.dispose();reality.dispose();music.dispose();visitors.dispose();companion.dispose();bark.dispose();environment.dispose()
         // Shared createWorldLifecycle disposes all remaining scene graphics exactly once.
       },
     },
