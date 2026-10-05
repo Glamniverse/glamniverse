@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { CONFIG as C } from './config.js'
+import { createBalconyPlants } from './balcony-plants.js'
 
 export function createLoft(parent) {
   const stone = new THREE.MeshStandardMaterial({ color: 0x1b1b27, roughness: 0.64, metalness: 0.12 })
@@ -44,6 +45,7 @@ export function createLoft(parent) {
     }
     mesh.computeBoundingSphere();parent.add(mesh)
   })
+  createBalconyPlants(parent)
   const light = new THREE.DirectionalLight(0xffe6f4, 2.4)
   light.position.set(-4,7,-3); parent.add(light)
   const fromColor=new THREE.Color(),toColor=new THREE.Color()

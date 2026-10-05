@@ -22,17 +22,17 @@ test('craft traversal and cooldown are deterministic, rare, distant and never ov
     peakDraws=Math.max(peakDraws,draws);peakTriangles=Math.max(peakTriangles,triangles)
   }
   assert.equal(starts,2);assert.equal(LIVING_SKY.cycle-LIVING_SKY.ufoDuration,66)
-  assert.equal(peakDraws,4);assert.equal(peakTriangles,162)
+  assert.equal(peakDraws,5);assert.equal(peakTriangles,454)
   console.log('Living sky peak addition',{draws:peakDraws,triangles:peakTriangles,textures:0,lights:0})
 })
 
 test('fixed structures remain distant, drift subtly and use two instanced draws',()=>{
   const h=setup(),batches=h.group.children.filter(o=>o.isInstancedMesh),matrix=new THREE.Matrix4(),p=new THREE.Vector3()
-  assert.equal(batches.length,2);assert.equal(h.sky.stats().skyStructureCount,2)
-  assert.deepEqual(batches.map(b=>b.count),[8,4])
+  assert.equal(batches.length,2);assert.equal(h.sky.stats().skyStructureCount,4)
+  assert.deepEqual(batches.map(b=>b.count),[28,32])
   for(let n=0;n<100;n++){
     h.advance(.2)
-    for(const b of batches)for(let i=0;i<b.count;i++){b.getMatrixAt(i,matrix);p.setFromMatrixPosition(matrix);assert.ok(p.z<=-112);assert.ok(p.y>20)}
+    for(const b of batches)for(let i=0;i<b.count;i++){b.getMatrixAt(i,matrix);p.setFromMatrixPosition(matrix);assert.ok(p.z<=-55);assert.ok(p.y>13)}
   }
 })
 
@@ -49,7 +49,7 @@ test('rift envelope is one slow rise and fall, never flashes or oscillates',()=>
   const rift=h.group.getObjectByName('SkyLoft_NeonRift')
   assert.ok(rift.visible);assert.ok(rift.material.opacity<=.32);assert.equal(rift.material.depthWrite,false)
   h.advance(4);assert.equal(rift.visible,false)
-  assert.equal(LIVING_SKY.cycle-LIVING_SKY.riftDuration,75)
+  assert.equal(LIVING_SKY.cycle-LIVING_SKY.riftDuration,74.2)
 })
 
 test('only Neon activates sky; repeated switches, interruption and dispose stay bounded',()=>{
@@ -57,7 +57,7 @@ test('only Neon activates sky; repeated switches, interruption and dispose stay 
   for(let n=0;n<12;n++)for(const species of ['neon-mantas','butterflies','jellyfish']){
     v.apply(species);v.update(n*100,true);v.update(n*100+20,true)
     assert.equal(v.stats().skyActive,species==='neon-mantas')
-    assert.equal(v.stats().skyUfoCount,1);assert.equal(v.stats().skyStructureCount,2)
+    assert.equal(v.stats().skyUfoCount,1);assert.equal(v.stats().skyStructureCount,4)
     const after=[];root.traverse(o=>after.push(o));assert.deepEqual(after,objects)
   }
   v.apply('neon-mantas');v.update(5000,true);v.update(5020,false);assert.equal(v.stats().skyActive,false)
@@ -72,4 +72,46 @@ test('visibility transition and cleanup add no textures, lights, listeners or ow
   for(const o of objects){assert.ok(!o.isLight);if(o.material){assert.equal(o.material.map,null);assert.equal(o.castShadow,false)}}
   h.sky.dispose();h.sky.dispose();h.advance(20);assert.equal(h.group.visible,false)
   const after=[];h.group.traverse(o=>after.push(o));assert.deepEqual(after,objects)
+})
+
+
+test('Quest-approved UFO geometry, material, schedule and sampled flight remain fixed',()=>{
+  const h=setup(),craft=h.group.getObjectByName('SkyLoft_DistantCraft'),[hull,rim]=craft.children
+  assert.deepEqual([LIVING_SKY.cycle,LIVING_SKY.ufoStart,LIVING_SKY.ufoDuration],[80,10,14])
+  assert.equal(hull.geometry.type,'OctahedronGeometry');assert.equal(hull.geometry.parameters.radius,1);assert.equal(hull.geometry.parameters.detail,0)
+  assert.deepEqual(hull.scale.toArray(),[7,.65,2.8]);assert.equal(hull.material.color.getHex(),0x151b32)
+  assert.equal(rim.material.color.getHex(),0x7896c8)
+  const actual=Array.from(rim.geometry.attributes.position.array),expected=[-7,0,0,0,0,-2.8,7,0,0,0,0,2.8]
+  actual.forEach((x,i)=>assert.ok(Math.abs(x-expected[i])<1e-6))
+  let previous=0
+  for(const age of [10.1,11,12,17,22,23,24]){
+    h.advance(age-previous);previous=age
+    if(age===24)continue // Floating point accumulation may still be just inside final frame.
+    const t=(age-10)/14,ease=x=>{x=Math.min(1,Math.max(0,x));return x*x*(3-2*x)}
+    assert.ok(craft.position.distanceTo(new THREE.Vector3(-110+220*t,29+1.5*Math.sin(Math.PI*t),-145-4*Math.sin(Math.PI*t)))<1e-8)
+    assert.ok(Math.abs(craft.rotation.x-.03*Math.sin(t*Math.PI))<1e-8)
+    assert.ok(Math.abs(craft.rotation.z-.06*Math.sin(t*Math.PI*2))<1e-8)
+    assert.ok(Math.abs(craft.scale.x-ease((age-10)/2)*ease((24-age)/2))<1e-8)
+  }
+})
+
+test('four city silhouettes have staggered 60-105m anchors and sparse window geometry',()=>{
+  const h=setup(),[bodies,windows]=h.group.children
+  for(const p of LIVING_SKY.structures){const distance=Math.hypot(...p);assert.ok(distance>60&&distance<105)}
+  assert.equal(bodies.count,28);assert.equal(windows.count,32)
+  assert.equal(windows.geometry.index.count/3,2);assert.equal(windows.material.transparent,false)
+  const matrix=new THREE.Matrix4(),a=new THREE.Vector3(),b=new THREE.Vector3()
+  bodies.getMatrixAt(0,matrix);a.setFromMatrixPosition(matrix);h.advance(10);bodies.getMatrixAt(0,matrix);b.setFromMatrixPosition(matrix)
+  assert.ok(a.distanceTo(b)<.2)
+})
+
+test('three larger rift branches form sequentially, fade softly and reset together',()=>{
+  const h=setup(),rifts=h.group.children.filter(o=>o.name.startsWith('SkyLoft_NeonRift'))
+  assert.equal(rifts.length,3);assert.deepEqual(LIVING_SKY.riftDelays,[0,.4,.8])
+  h.advance(46.2);assert.deepEqual(rifts.map(r=>r.visible),[true,false,false])
+  h.advance(.4);assert.deepEqual(rifts.map(r=>r.visible),[true,true,false])
+  h.advance(.4);assert.deepEqual(rifts.map(r=>r.visible),[true,true,true])
+  for(const r of rifts){assert.ok(r.position.length()>110);assert.ok(r.scale.x>=1.6);assert.ok(r.material.opacity<=.32)}
+  h.advance(5);assert.ok(rifts.every(r=>!r.visible))
+  h.sky.reset();assert.ok(rifts.every(r=>!r.visible&&r.material.opacity===0))
 })

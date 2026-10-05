@@ -1,12 +1,38 @@
 import * as THREE from 'three'
 
 export const LIVING_SKY=Object.freeze({cycle:80,ufoStart:10,ufoDuration:14,riftStart:46,
-  riftDuration:5,riftIn:2,riftHold:.5,riftOut:2.5,
-  structures:[[-48,23,-115],[64,30,-145]]})
+  riftDuration:5.8,riftIn:2,riftHold:.5,riftOut:2.5,riftDelays:[0,.4,.8],
+  structures:[[-28,16,-58],[31,21,-72],[-60,25,-64],[63,28,-76]]})
 const ease=t=>{t=THREE.MathUtils.clamp(t,0,1);return t*t*(3-2*t)}
 export function riftEnvelope(age){
   if(age<0||age>=5)return 0
   return age<2?ease(age/2):age<2.5?1:1-ease((age-2.5)/2.5)
+}
+// Local architectural components: platform, underslung core, asymmetric towers,
+// bridge and spire. Four profiles share two draws, with irregular lit floors.
+function cityParts(){
+  const bodies=[],windows=[]
+  const profiles=[[[ -3,4,2],[0,7,2],[3.5,3,1.6]],
+    [[-4,6,1.7],[-.5,3,2.6],[3,8,1.5]],
+    [[-3.5,3,2.5],[0,9,1.5],[3,5,2]],
+    [[-4,7,1.5],[-1,5,2],[3.2,4,2.4]]]
+  const add=(list,city,x,y,z,w,h,d=1)=>list.push({city,local:new THREE.Matrix4().makeScale(w,h,d).setPosition(x,y,z)})
+  profiles.forEach((towers,i)=>{
+    add(bodies,i,0,0,0,12,.7,5)
+    add(bodies,i,i%2?2:-2,-1.3,0,4,2,2.8)
+    add(bodies,i,i%2?-3:3,2.6,-.4,7,.3,.7)
+    towers.forEach(([x,h,w],j)=>{
+      const z=j===1?-.7:.4
+      add(bodies,i,x,.35+h/2,z,w,h,1.8)
+      // Sparse window bands; no uniform illuminated grid.
+      for(let k=0;k<2;k++)add(windows,i,x+(k?-.15:.12),1.2+k*(h-1.4)*.7,z+.91,w*.7,.13)
+      if(j===i%3)add(windows,i,x+w*.38,.7+h/2,z+.92,.09,h*.72)
+    })
+    const tallest=towers.reduce((a,b)=>a[1]>b[1]?a:b)
+    add(bodies,i,tallest[0],tallest[1]+1.35,tallest===towers[1]?-.7:.4,.12,2,.12)
+    add(windows,i,-1,.12,2.51,8,.08)
+  })
+  return {bodies,windows}
 }
 // One fixed pool, autonomous elapsed time, no timers, audio clock or interactions.
 export function createNeonSky(parent){
@@ -14,8 +40,10 @@ export function createNeonSky(parent){
   const box=new THREE.BoxGeometry(1,1,1)
   const bodyMaterial=new THREE.MeshBasicMaterial({color:0x151b32,toneMapped:false})
   const accentMaterial=new THREE.MeshBasicMaterial({color:0x657fbc,toneMapped:false})
-  const structures=new THREE.InstancedMesh(box,bodyMaterial,8)
-  const accents=new THREE.InstancedMesh(box,accentMaterial,4)
+  const parts=cityParts()
+  const structures=new THREE.InstancedMesh(box,bodyMaterial,parts.bodies.length)
+  const accents=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),accentMaterial,parts.windows.length)
+  accentMaterial.side=THREE.DoubleSide
   structures.frustumCulled=false;accents.frustumCulled=false
   structures.instanceMatrix.setUsage(THREE.DynamicDrawUsage);accents.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
   group.add(structures,accents)
@@ -37,10 +65,15 @@ export function createNeonSky(parent){
   }
   const fissureGeometry=new THREE.BufferGeometry();fissureGeometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));fissureGeometry.setIndex(indices)
   const riftMaterial=new THREE.MeshBasicMaterial({color:0x8592cd,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,toneMapped:false})
-  const rift=new THREE.Mesh(fissureGeometry,riftMaterial);rift.name='SkyLoft_NeonRift';rift.position.set(-24,39,-125);group.add(rift)
-  const object=new THREE.Object3D()
+  const rifts=[[-24,39,-110,2.2,2],[-9,45,-113,1.9,1.7],[4,49,-116,1.6,1.5]].map(([x,y,z,sx,sy],i)=>{
+    const rift=new THREE.Mesh(fissureGeometry,i?riftMaterial.clone():riftMaterial)
+    rift.name=i?`SkyLoft_NeonRift_${i}`:'SkyLoft_NeonRift'
+    rift.position.set(x,y,z);rift.scale.set(sx,sy,1);group.add(rift);return rift
+  })
+  const object=new THREE.Object3D(),matrix=new THREE.Matrix4()
+  const cityMatrices=LIVING_SKY.structures.map(()=>new THREE.Matrix4())
   let elapsed=0,last=null,disposed=false,visibility=1
-  const reset=()=>{elapsed=0;last=null;group.visible=false;craft.visible=false;rift.visible=false;riftMaterial.opacity=0}
+  const reset=()=>{elapsed=0;last=null;group.visible=false;craft.visible=false;for(const rift of rifts){rift.visible=false;rift.material.opacity=0}}
   reset()
   return {
     reset,
@@ -53,19 +86,17 @@ export function createNeonSky(parent){
       bodyMaterial.color.setHex(0x151b32).multiplyScalar(visibility)
       accentMaterial.color.setHex(0x657fbc).multiplyScalar(visibility)
       rim.material.color.setHex(0x7896c8).multiplyScalar(visibility)
-      for(let i=0;i<2;i++){
-        const [x,y,z]=LIVING_SKY.structures[i],drift=.18*Math.sin(elapsed*.08+i)
-        // Slab and offset monoliths: city architecture, not natural floating islands.
-        for(let j=0;j<4;j++){
-          object.position.set(x+(j===0?0:(j-2)*2.4),y+drift+(j===0?0:j===2?2.9:1.6),z)
-          object.rotation.set(0,.08*Math.sin(elapsed*.025+i),0)
-          object.scale.set(j===0?12:1.3,j===0?.7:j===2?5.8:3.2,j===0?5:1.6)
-          object.updateMatrix();structures.setMatrixAt(i*4+j,object.matrix)
-        }
-        for(let j=0;j<2;j++){
-          object.position.set(x,y+drift+.4,z+(j?2.35:-2.35));object.scale.set(11,.07,.07)
-          object.rotation.set(0,0,0);object.updateMatrix();accents.setMatrixAt(i*2+j,object.matrix)
-        }
+      for(let i=0;i<LIVING_SKY.structures.length;i++){
+        const [x,y,z]=LIVING_SKY.structures[i]
+        object.position.set(x,y+.18*Math.sin(elapsed*.08+i),z)
+        object.rotation.set(0,.08*Math.sin(elapsed*.025+i),0)
+        object.updateMatrix();cityMatrices[i].copy(object.matrix)
+      }
+      for(let i=0;i<parts.bodies.length;i++){
+        const part=parts.bodies[i];matrix.multiplyMatrices(cityMatrices[part.city],part.local);structures.setMatrixAt(i,matrix)
+      }
+      for(let i=0;i<parts.windows.length;i++){
+        const part=parts.windows[i];matrix.multiplyMatrices(cityMatrices[part.city],part.local);accents.setMatrixAt(i,matrix)
       }
       structures.instanceMatrix.needsUpdate=true;accents.instanceMatrix.needsUpdate=true
       const phase=elapsed%LIVING_SKY.cycle,ufoAge=phase-LIVING_SKY.ufoStart
@@ -76,12 +107,13 @@ export function createNeonSky(parent){
         craft.rotation.set(.03*Math.sin(t*Math.PI),0,.06*Math.sin(t*Math.PI*2))
         craft.scale.setScalar(ease(ufoAge/2)*ease((LIVING_SKY.ufoDuration-ufoAge)/2))
       }
-      const envelope=riftEnvelope(phase-LIVING_SKY.riftStart)
-      rift.visible=envelope>0;riftMaterial.opacity=.32*envelope*visibility
-      rift.scale.set(1,.85+.15*envelope,1)
+      for(let i=0;i<rifts.length;i++){
+        const envelope=riftEnvelope(phase-LIVING_SKY.riftStart-LIVING_SKY.riftDelays[i])
+        rifts[i].visible=envelope>0;rifts[i].material.opacity=.32*envelope*visibility
+      }
     },
-    stats:()=>({skyStructureCount:2,skyUfoCount:1,skyActive:group.visible,
-      skyUfoActive:group.visible&&craft.visible,skyRiftActive:group.visible&&rift.visible}),
+    stats:()=>({skyStructureCount:4,skyUfoCount:1,skyActive:group.visible,
+      skyUfoActive:group.visible&&craft.visible,skyRiftActive:group.visible&&rifts.some(rift=>rift.visible)}),
     dispose(){if(disposed)return;reset();disposed=true},
     // Attached graphics are released by the existing world resource disposer.
   }
