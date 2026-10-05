@@ -110,14 +110,15 @@ test('successful texture is sRGB, no mipmaps, and clears on disposal',()=>{
   assert.equal(loader.requests[0].texture.colorSpace,THREE.SRGBColorSpace)
   env.dispose();assert.equal(parent.children[0].material.map,null)
 })
-test('geometry budget is bounded; no transparent materials, shadows or frame animation',()=>{
+test('geometry budget is bounded; only lyrics and the narrow rift use transparency; no shadows',()=>{
   const h=harness();let calls=0,triangles=0,textures=new Set(),lights=0
   h.game.scene.traverse(o=>{
     if(o.isMesh&&o.material.visible){calls++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3*(o.isInstancedMesh?o.count:1)
-      if(o.parent.name!=='SkyLoft_SpatialLyrics')assert.equal(o.material.transparent,false);if(o.material.map)textures.add(o.material.map)}
+      if(o.name==='SkyLoft_NeonRift'){assert.equal(o.geometry.index.count/3,18);assert.equal(o.material.depthWrite,false);assert.ok(o.material.opacity<=.32)}
+      else if(o.parent.name!=='SkyLoft_SpatialLyrics')assert.equal(o.material.transparent,false);if(o.material.map)textures.add(o.material.map)}
     if(o.isLight){lights++;assert.ok(!o.castShadow)}
   })
-  assert.ok(calls<=25);assert.ok(triangles<9000);assert.equal(textures.size,9);assert.equal(lights,2)
+  assert.ok(calls<=29);assert.ok(triangles<9170);assert.equal(textures.size,9);assert.equal(lights,2)
   console.log('Sky Loft static budget', {calls,triangles,textures:textures.size+1,lights})
   assert.ok(CONFIG.selectorDistance<5);h.game.xrHooks.dispose()
 })

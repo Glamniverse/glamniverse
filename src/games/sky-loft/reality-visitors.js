@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { createVisitors } from './visitors.js'
 import { createButterflies } from './butterflies.js'
 import { createJellyfish } from './jellyfish.js'
+import { createNeonSky } from './neon-sky.js'
 
 // Species registry, deliberately separate from persistent companion and scene lifecycle.
 export function createRealityVisitors(parent){
@@ -15,9 +16,10 @@ export function createRealityVisitors(parent){
     })
     group.visible=false;systems[id]={group,system,materials}
   }
+  const sky=createNeonSky(parent)
   let selected=null,visibility=1,disposed=false
   function setVisibility(value){
-    visibility=value
+    visibility=value;sky.setVisibility(selected==='neon-mantas'?value:0)
     for(const [id,s] of Object.entries(systems)){
       s.group.visible=id===selected&&value>0
       if(id!==selected)continue
@@ -28,19 +30,20 @@ export function createRealityVisitors(parent){
     apply(id){
       if(disposed||!systems[id])return false
       if(selected===id)return true
+      sky.reset()
       if(selected)systems[selected].system.reset()
       selected=id;systems[id].system.reset()
       systems[id].system.apply?.(id);setVisibility(visibility);return true
     },
     setVisibility,
-    update(time,enabled,input){if(!disposed&&selected)systems[selected].system.update(time,enabled,input)},
-    reset(){for(const s of Object.values(systems))s.system.reset()},
+    update(time,enabled,input){if(!disposed&&selected){systems[selected].system.update(time,enabled,input);sky.update(time,enabled&&selected==='neon-mantas')}},
+    reset(){sky.reset();for(const s of Object.values(systems))s.system.reset()},
     stats:()=>{
       const stats=selected?systems[selected].system.stats():{}
       return {visitorSpecies:selected,visitorPool:stats.visitorPool??stats.butterflyPool??stats.jellyfishPool??0,
         activeVisitors:stats.activeVisitors??stats.activeButterflies??stats.activeJellyfish??0,
-        ...systems.butterflies.system.stats(),...systems.jellyfish.system.stats()}
+        ...systems.butterflies.system.stats(),...systems.jellyfish.system.stats(),...sky.stats()}
     },
-    dispose(){if(disposed)return;disposed=true;for(const s of Object.values(systems)){s.system.dispose();s.group.visible=false}},
+    dispose(){if(disposed)return;disposed=true;sky.dispose();for(const s of Object.values(systems)){s.system.dispose();s.group.visible=false}},
   }
 }
