@@ -41,13 +41,13 @@ test('rift envelope is one slow rise and fall, never flashes or oscillates',()=>
   let previous=0
   for(let n=0;n<=500;n++){
     const age=n/100,v=riftEnvelope(age)
-    assert.ok(v>=0&&v<=1);assert.ok(Math.abs(v-previous)*.32<=.0025)
+    assert.ok(v>=0&&v<=1);assert.ok(Math.abs(v-previous)*.42<=.0032)
     if(age<=2.5)assert.ok(v>=previous);else assert.ok(v<=previous)
     previous=v
   }
   const h=setup();h.advance(48)
   const rift=h.group.getObjectByName('SkyLoft_NeonRift')
-  assert.ok(rift.visible);assert.ok(rift.material.opacity<=.32);assert.equal(rift.material.depthWrite,false)
+  assert.ok(rift.visible);assert.ok(rift.material.opacity<=.42);assert.equal(rift.material.depthWrite,false)
   h.advance(4);assert.equal(rift.visible,false)
   assert.equal(LIVING_SKY.cycle-LIVING_SKY.riftDuration,74.2)
 })
@@ -111,7 +111,18 @@ test('three larger rift branches form sequentially, fade softly and reset togeth
   h.advance(46.2);assert.deepEqual(rifts.map(r=>r.visible),[true,false,false])
   h.advance(.4);assert.deepEqual(rifts.map(r=>r.visible),[true,true,false])
   h.advance(.4);assert.deepEqual(rifts.map(r=>r.visible),[true,true,true])
-  for(const r of rifts){assert.ok(r.position.length()>110);assert.ok(r.scale.x>=1.6);assert.ok(r.material.opacity<=.32)}
+  for(const r of rifts){assert.ok(r.position.length()>110);assert.ok(r.scale.x>=1.6);assert.ok(r.material.opacity<=.42)}
   h.advance(5);assert.ok(rifts.every(r=>!r.visible))
   h.sky.reset();assert.ok(rifts.every(r=>!r.visible&&r.material.opacity===0))
+})
+
+
+test('rift centers sit high above cities with conservative opacity and unchanged geometry',()=>{
+ const h=setup(),rifts=h.group.children.filter(o=>o.name.startsWith('SkyLoft_NeonRift'))
+ const old=[[ -24,39,-110],[-9,45,-113],[4,49,-116]]
+ assert.deepEqual(rifts.map(r=>r.position.toArray()),[[-24,95,-110],[-9,101,-113],[4,105,-116]])
+ const elevation=([x,y,z])=>Math.atan2(y-1.6,Math.hypot(x,z))*180/Math.PI
+ rifts.forEach((r,i)=>{assert.ok(elevation(r.position.toArray())-elevation(old[i])>19);assert.equal(r.geometry.index.count/3,18);assert.equal(r.material.color.getHex(),0x8592cd)})
+ h.advance(48.1);assert.ok(Math.abs(rifts[0].material.opacity-.42)<1e-8)
+ assert.equal(LIVING_SKY.riftDuration,5.8);assert.equal(LIVING_SKY.riftStart,46);assert.equal(LIVING_SKY.cycle,80)
 })

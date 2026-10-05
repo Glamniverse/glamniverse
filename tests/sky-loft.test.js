@@ -114,7 +114,7 @@ test('geometry budget is bounded; only lyrics and the narrow rift use transparen
   const h=harness();let calls=0,triangles=0,textures=new Set(),lights=0
   h.game.scene.traverse(o=>{
     if(o.isMesh&&o.material.visible){calls++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3*(o.isInstancedMesh?o.count:1)
-      if(o.name.startsWith('SkyLoft_NeonRift')){assert.equal(o.geometry.index.count/3,18);assert.equal(o.material.depthWrite,false);assert.ok(o.material.opacity<=.32)}
+      if(o.name.startsWith('SkyLoft_NeonRift')){assert.equal(o.geometry.index.count/3,18);assert.equal(o.material.depthWrite,false);assert.ok(o.material.opacity<=.42)}
       else if(o.parent.name!=='SkyLoft_SpatialLyrics')assert.equal(o.material.transparent,false);if(o.material.map)textures.add(o.material.map)}
     if(o.isLight){lights++;assert.ok(!o.castShadow)}
   })

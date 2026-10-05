@@ -29,6 +29,22 @@ export function validMovement(ax,az,bx,bz){
  }
  return true
 }
+// Room-scale motion can put the headset just outside the artificial footprint.
+// Keep that physical offset; allow only inward/tangential artificial steps, never
+// snap it back. Project only the collision query onto the unchanged floor bounds.
+export function resolveMovement(ax,az,bx,bz,out){
+ if(!Number.isFinite(ax)||!Number.isFinite(az)||!Number.isFinite(bx)||!Number.isFinite(bz))return false
+ const sx=THREE.MathUtils.clamp(ax,-edgeX,edgeX),sz=THREE.MathUtils.clamp(az,-edgeZ,edgeZ)
+ const x=THREE.MathUtils.clamp(bx,Math.min(ax,-edgeX),Math.max(ax,edgeX))
+ const z=THREE.MathUtils.clamp(bz,Math.min(az,-edgeZ),Math.max(az,edgeZ))
+ const tx=THREE.MathUtils.clamp(x,-edgeX,edgeX),tz=THREE.MathUtils.clamp(z,-edgeZ,edgeZ)
+ if(validMovement(sx,sz,tx,tz)){out.x=x;out.z=z;return true}
+ // A blocked diagonal may still slide along one safe axis; swept furniture
+ // checks remain authoritative, including when the origin was already invalid.
+ if(x!==ax&&validMovement(sx,sz,tx,sz)){out.x=x;out.z=az;return true}
+ if(z!==az&&validMovement(sx,sz,sx,tz)){out.x=ax;out.z=z;return true}
+ return false
+}
 function stick(controllers,hand,out){
  for(const e of controllers||[]){
   if(!e.connected||!e.controller?.visible||e.source?.handedness!==hand||e.source.gamepad?.mapping!=='xr-standard')continue
@@ -52,10 +68,11 @@ export function createExploration(place){
    const origin=state.origin,p=pose.transform.position,r=pose.transform.orientation
    origin.updateWorldMatrix(true,false);head.set(p.x,p.y,p.z).applyMatrix4(origin.matrixWorld)
    local.copy(head);place.worldToLocal(local)
+   if(!Number.isFinite(local.x)||!Number.isFinite(local.y)||!Number.isFinite(local.z))return
    const hasTurn=stick(state.interaction?.controllers,'right',turn)
    if(!hasTurn)turnReady=false
    else if(turn.length()<.25)turnReady=true
-   else if(turnReady&&Math.abs(turn.x)>=.7&&time/1000>=nextTurn&&isWalkable(local.x,local.z)){
+   else if(turnReady&&Math.abs(turn.x)>=.7&&time/1000>=nextTurn){
     turnReady=false;nextTurn=time/1000+EXPLORATION.snapCooldown
     origin.rotation.y-=Math.sign(turn.x)*THREE.MathUtils.degToRad(EXPLORATION.snapDegrees)
     origin.updateMatrixWorld(true);after.set(p.x,p.y,p.z).applyMatrix4(origin.matrixWorld)
@@ -64,14 +81,15 @@ export function createExploration(place){
    const hasLeft=stick(state.interaction?.controllers,'left',left),mag=left.length()
    if(!hasLeft)moveReady=false
    else if(mag<=EXPLORATION.deadzone)moveReady=true
-   else if(moveReady&&isWalkable(local.x,local.z)){
+   else if(moveReady){
     q.set(r.x,r.y,r.z,r.w);forward.set(0,0,-1).applyQuaternion(q).applyQuaternion(origin.quaternion);forward.y=0
     if(forward.lengthSq()<.0001)return
     forward.normalize();right.set(-forward.z,0,forward.x)
     const step=EXPLORATION.speed*dt*(Math.min(1,mag)-EXPLORATION.deadzone)/(1-EXPLORATION.deadzone)
     candidate.copy(head).addScaledVector(right,left.x/mag*step).addScaledVector(forward,-left.y/mag*step)
     after.copy(candidate);place.worldToLocal(after)
-    if(validMovement(local.x,local.z,after.x,after.z)){
+    if(resolveMovement(local.x,local.z,after.x,after.z,after)){
+     candidate.copy(after);place.localToWorld(candidate)
      origin.position.x+=candidate.x-head.x;origin.position.z+=candidate.z-head.z;origin.updateMatrixWorld(true)
     }
    }

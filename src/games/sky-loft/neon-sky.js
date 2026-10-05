@@ -65,7 +65,7 @@ export function createNeonSky(parent){
   }
   const fissureGeometry=new THREE.BufferGeometry();fissureGeometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));fissureGeometry.setIndex(indices)
   const riftMaterial=new THREE.MeshBasicMaterial({color:0x8592cd,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,toneMapped:false})
-  const rifts=[[-24,39,-110,2.2,2],[-9,45,-113,1.9,1.7],[4,49,-116,1.6,1.5]].map(([x,y,z,sx,sy],i)=>{
+  const rifts=[[-24,95,-110,2.2,2],[-9,101,-113,1.9,1.7],[4,105,-116,1.6,1.5]].map(([x,y,z,sx,sy],i)=>{
     const rift=new THREE.Mesh(fissureGeometry,i?riftMaterial.clone():riftMaterial)
     rift.name=i?`SkyLoft_NeonRift_${i}`:'SkyLoft_NeonRift'
     rift.position.set(x,y,z);rift.scale.set(sx,sy,1);group.add(rift);return rift
@@ -109,7 +109,7 @@ export function createNeonSky(parent){
       }
       for(let i=0;i<rifts.length;i++){
         const envelope=riftEnvelope(phase-LIVING_SKY.riftStart-LIVING_SKY.riftDelays[i])
-        rifts[i].visible=envelope>0;rifts[i].material.opacity=.32*envelope*visibility
+        rifts[i].visible=envelope>0;rifts[i].material.opacity=.42*envelope*visibility
       }
     },
     stats:()=>({skyStructureCount:4,skyUfoCount:1,skyActive:group.visible,

@@ -177,3 +177,55 @@ test('leaving during PET does not produce a delayed whimper after PET completes'
  for(let i=0;i<50;i++){head.x-=.05;assert.equal(a.update(.05,head,dog,true),false)}
  for(let i=0;i<100;i++)assert.equal(a.update(.05,head,dog,false),false)
 })
+
+
+// Exercise the actual controller/rig path, including physical headset overshoot.
+const boundaryCases=[
+ ['left',-6.35,0,-1,0,0,-1],['right',6.35,0,1,0,0,-1],
+ ['front',3,-5.15,0,-1,1,0],['rear',5,5.15,0,1,-1,0],
+ ['corner',-6.35,-5.15,-1,-1,0,1],
+]
+function headPosition(h){h.origin.updateMatrixWorld(true);return new THREE.Vector3().copy(h.pose.transform.position).applyMatrix4(h.origin.matrixWorld)}
+for(const [name,x,z,ox,oz,tx,tz] of boundaryCases){
+ test(`${name} boundary blocks repeated outward pressure, slides and immediately recovers even after room-scale overshoot`,()=>{
+  for(const overshoot of [0,1e-9,.02]){
+   const h=movement();h.pose.transform.position.x=x+ox*overshoot;h.pose.transform.position.z=z+oz*overshoot
+   h.motion.setMode('slow');h.tick();const initial=headPosition(h)
+   h.left.source.gamepad.axes[2]=ox;h.left.source.gamepad.axes[3]=oz;h.tick(300)
+   assert.ok(headPosition(h).distanceTo(initial)<1e-8,'outward pressure must not increase overshoot')
+   h.left.source.gamepad.axes[2]=0;h.left.source.gamepad.axes[3]=0;h.tick()
+   h.left.source.gamepad.axes[2]=-ox;h.left.source.gamepad.axes[3]=-oz;h.tick()
+   const recovered=headPosition(h),delta=recovered.clone().sub(initial)
+   assert.ok(delta.x*-ox+delta.z*-oz>0,'first inward frame must move')
+   assert.ok(delta.length()<=C.speed/60+1e-8,'no recovery teleport')
+   h.tick(10);assert.equal(isWalkable(headPosition(h).x,headPosition(h).z),true)
+   // Independently verify tangential movement at the original exact boundary.
+   const t=movement();t.pose.transform.position.x=x;t.pose.transform.position.z=z;t.motion.setMode('slow');t.tick()
+   t.left.source.gamepad.axes[2]=ox+tx;t.left.source.gamepad.axes[3]=oz+tz
+   // Corner tangent uses only its valid axis, not pressure against both edges.
+   if(name==='corner'){t.left.source.gamepad.axes[2]=-1;t.left.source.gamepad.axes[3]=1}
+   const before=headPosition(t);t.tick(10);const after=headPosition(t)
+   assert.ok((after.x-before.x)*tx+(after.z-before.z)*tz>0,'slide along valid axis')
+   assert.ok(Math.abs(after.x)<=6.35+1e-8&&Math.abs(after.z)<=5.15+1e-8)
+  }
+ })
+ test(`${name} boundary snap-turn remains independent of rejected translation and rearms`,()=>{
+  const h=movement();h.pose.transform.position.x=x+ox*.001;h.pose.transform.position.z=z+oz*.001
+  h.motion.setMode('slow');h.tick();h.left.source.gamepad.axes[2]=ox;h.left.source.gamepad.axes[3]=oz
+  h.tick(60);h.right.source.gamepad.axes[2]=1;h.tick()
+  assert.ok(Math.abs(h.origin.rotation.y+Math.PI/6)<1e-8)
+  h.tick(60);assert.ok(Math.abs(h.origin.rotation.y+Math.PI/6)<1e-8,'held turn must not repeat')
+  h.right.source.gamepad.axes[2]=0;h.tick();h.right.source.gamepad.axes[2]=1;h.tick()
+  assert.ok(Math.abs(h.origin.rotation.y+Math.PI/3)<1e-8)
+ })
+}
+
+test('unchanged footprint and comfort constants; rotated anchored room also recovers from physical edge overshoot',()=>{
+ assert.equal(C.speed,.45);assert.equal(C.snapDegrees,30);assert.equal(C.snapCooldown,.45);assert.equal(C.deadzone,.22);assert.equal(C.clearance,.35)
+ assert.equal(isWalkable(6.35,0),true);assert.equal(isWalkable(6.350001,0),false)
+ assert.equal(isWalkable(3,-5.15),true);assert.equal(isWalkable(3,-5.150001),false)
+ const h=movement();h.place.position.set(2,0,3);h.place.rotation.y=.7;h.place.updateMatrixWorld(true)
+ const world=h.place.localToWorld(new THREE.Vector3(-6.350001,0,0));h.origin.position.x=world.x;h.origin.position.z=world.z;h.origin.rotation.y=.7
+ h.motion.setMode('slow');h.tick();h.left.source.gamepad.axes[2]=1;h.tick(10)
+ const recovered=h.place.worldToLocal(headPosition(h));assert.ok(recovered.x>-6.35);assert.ok(Math.abs(recovered.z)<1e-8)
+})
