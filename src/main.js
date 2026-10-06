@@ -368,7 +368,7 @@ function resumeRuntime() {
 }
 
 function startWorldAnimation(worldId, scene, camera, update, xrMemory = null, xrHooks = null) {
-  document.querySelector('.control-hint').classList.toggle('hidden', (worldId === 'smashTheHate' || worldId === 'allEyesOnMe' || worldId === 'skyLoft'))
+  document.querySelector('.control-hint').classList.toggle('hidden', (worldId === 'smashTheHate' || worldId === 'allEyesOnMe' || worldId === 'skyLoft' || worldId === 'noAir'))
   activeWorld = { worldId, scene, camera, update, xrMemory, xrHooks }
   resumeRuntime()
   updateVRControl()
@@ -1327,6 +1327,35 @@ window.openSmashTheHate = async function () {
     entry.onclick = openLoft
     document.querySelector('#vr-experience-grid').appendChild(card)
   }).catch(error => console.warn('Sky Loft entry unavailable:', error))
+}
+// NO AIR M1 is only exposed in local development and Vercel Preview.
+if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
+  stationaryVRWorlds.add('noAir')
+  import('./games/no-air/index.js').then(({ createNoAir }) => {
+    const card = document.createElement('article'); card.className = 'vr-experience-card'
+    const title = document.createElement('h4'); title.textContent = 'NO AIR, BUT STILL BREATHING'
+    const copy = document.createElement('p'); copy.textContent = 'An ocean to disappear into. Preview • Squeeze grips and sweep hands back to swim; release to recover. Left stick: drift. Right stick: rise/dive or snap-turn.'
+    const entry = document.createElement('button'); entry.textContent = 'ENTER NO AIR'; entry.id = 'no-air-entry'
+    const study = document.createElement('button'); study.textContent = 'DESKTOP OCEAN STUDY'
+    async function openOcean(desktop = false) {
+      if (deferUntilVRExit(() => openOcean(desktop))) return
+      if (!desktop && !await checkVRExperienceSupport('noAir', {
+        title: 'NO AIR', tagline: 'but still breathing', description: 'A dedicated underwater Glamniverse experience.',
+      })) return
+      if (desktop && document.querySelector('#portal-world').classList.contains('hidden')) window.openPortalWorld()
+      disposeCurrentWorld()
+      document.querySelectorAll('.portal-label').forEach(label => { label.style.display = 'none' })
+      document.querySelector('#district-confirm').classList.add('hidden')
+      document.querySelector('#district-exit').classList.remove('hidden')
+      document.querySelector('#song-modal').classList.add('hidden')
+      document.querySelector('#song-video').pause(); document.querySelector('#song-audio').pause()
+      const ocean = createNoAir()
+      createWorldLifecycle(ocean.scene)
+      startWorldAnimation('noAir', ocean.scene, ocean.camera, ocean.update, null, ocean.xrHooks)
+    }
+    entry.onclick = () => openOcean(false); study.onclick = () => openOcean(true)
+    card.append(title,copy,entry,study); document.querySelector('#vr-experience-grid').appendChild(card)
+  }).catch(error => console.warn('No Air entry unavailable:', error))
 }
 function showInHisMindRoom() {
   disposeCurrentWorld()
