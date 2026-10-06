@@ -8,21 +8,31 @@ import {createCompanion} from '../src/games/sky-loft/companion.js'
 const bytes=readFileSync(new URL('../public/models/sky-loft/bichon/bichon.glb',import.meta.url))
 const asset=()=>new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'')
 
-test('original GLB: seven skinned meshes, 25 bones, three materials, required clips and real scale',async()=>{
+test('M3 GLB: seven skinned meshes, 27 bones, three materials, required clips and real scale',async()=>{
  const g=await asset(),meshes=[],materials=new Set()
- g.scene.traverse(o=>{if(o.isMesh){meshes.push(o);materials.add(o.material);assert.ok(o.isSkinnedMesh);assert.equal(o.skeleton.bones.length,25)}})
+ g.scene.traverse(o=>{if(o.isMesh){meshes.push(o);materials.add(o.material);assert.ok(o.isSkinnedMesh);assert.equal(o.skeleton.bones.length,27)}})
  assert.equal(meshes.length,7);assert.equal(materials.size,3)
  assert.equal(meshes.reduce((n,m)=>n+m.geometry.index.count/3,0),23088)
- assert.deepEqual(g.animations.map(c=>c.name).sort(),['HappyHop','Idle','Trot'])
+ assert.deepEqual(g.animations.map(c=>c.name).sort(),['HappyHop','Idle','StandUp','Trot'])
  const size=new THREE.Box3().setFromObject(g.scene,true).getSize(new THREE.Vector3())
  assert.ok(size.y>.41&&size.y<.43);assert.equal(C.maxCount,1)
+ assert.deepEqual(Object.fromEntries(g.animations.map(c=>[c.name,Number(c.duration.toFixed(3))])),{HappyHop:1.6,Idle:4,StandUp:2.8,Trot:.8})
+ assert.ok(g.scene.getObjectByName('shoulder_R_deform'));assert.ok(g.scene.getObjectByName('shoulder_L_deform'))
+ for(const m of meshes){
+  assert.equal(m.geometry.attributes.skinWeight.itemSize,4)
+  for(let i=0;i<m.geometry.attributes.skinWeight.count;i++){
+   let sum=0;for(let j=0;j<4;j++){sum+=m.geometry.attributes.skinWeight.getComponent(i,j);assert.ok(m.geometry.attributes.skinIndex.getComponent(i,j)<27)}
+   assert.ok(Math.abs(sum-1)<1e-6)
+  }
+  assert.equal(m.material.map,null)
+ }
  const mixer=new THREE.AnimationMixer(g.scene)
  for(const clip of g.animations){
   mixer.stopAllAction();mixer.clipAction(clip).play()
   for(let i=0;i<=20;i++){
    mixer.setTime(clip.duration*i/20);g.scene.updateMatrixWorld(true)
    const b=new THREE.Box3().setFromObject(g.scene,true)
-   assert.ok(b.min.y>-.003);assert.ok(b.max.y<.46);assert.ok(b.max.x-b.min.x<.24)
+   assert.ok(b.min.y>-.003);assert.ok(b.max.y<(clip.name==='StandUp'?.63:.46));assert.ok(b.max.x-b.min.x<.24)
   }
  }
  mixer.stopAllAction();mixer.clipAction(g.animations.find(c=>c.name==='HappyHop')).reset().play();mixer.setTime(.736);g.scene.updateMatrixWorld(true)
@@ -160,4 +170,39 @@ test('real tail overlay is bounded and restored on interruption; approved skin a
    assert.equal(h.c.stats().companionState,'IDLE')
  }
  assert.ok(maximum>.06);h.c.dispose();assert.equal(h.targets.length,0)
+})
+
+
+test('pet alternates HappyHop and StandUp; planted orientation, completion and interruption remain safe',async()=>{
+ const h=await petHarness();h.head.set(2.45,1.6,1.05)
+ let time=0
+ h.c.update(time,h.head,true)
+ for(const expected of ['HappyHop','StandUp','HappyHop','StandUp']){
+  h.targets[0].select();const pets=h.c.stats().companionPets
+  const seen=new Set();let lockedYaw
+  for(let i=1;i<=180;i++){
+   time+=20;h.c.update(time,h.head,true);seen.add(h.c.stats().companionAnimation)
+   if(i<100)h.targets[0].select() // rejected repeats during cooldown
+   if(expected==='StandUp'&&i===20)lockedYaw=h.root.children[0].rotation.y
+   if(expected==='StandUp'&&i>20&&i<125){
+    h.head.z+=.001
+    assert.ok(Math.abs(h.root.children[0].rotation.y-lockedYaw)<1e-10)
+   }
+  }
+  assert.equal(h.c.stats().companionPets,pets)
+  assert.ok(seen.has(expected));assert.equal(h.c.stats().companionPetReaction,expected)
+  assert.notEqual(h.c.stats().companionState,'PET_REACTION')
+  assert.notEqual(h.c.stats().companionAnimation,'StandUp')
+  assert.equal(h.c.stats().companionCount,1)
+ }
+ assert.equal(h.greetings(),4)
+ // Interrupt a new StandUp while upright, then recover without reloading.
+ h.targets[0].select();for(let i=0;i<180;i++){time+=20;h.c.update(time,h.head,true)}
+ h.targets[0].select();for(let i=0;i<60;i++){time+=20;h.c.update(time,h.head,true)}
+ assert.equal(h.c.stats().companionAnimation,'StandUp')
+ h.c.update(time+1,null,false);assert.equal(h.c.stats().companionAnimation,null)
+ h.c.update(time+20,h.head,true);assert.equal(h.c.stats().companionAnimation,'Idle')
+ h.c.reset();h.c.bind(h.interaction,()=>true);h.c.update(0,h.head,true);h.targets[0].select();h.c.update(20,h.head,true)
+ assert.equal(h.c.stats().companionPetReaction,'HappyHop');assert.equal(h.targets.length,1)
+ h.c.dispose()
 })

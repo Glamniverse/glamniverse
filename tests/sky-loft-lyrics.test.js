@@ -111,7 +111,7 @@ function world(){
   const media=new Media(),registered=[],requests=[];let dogLoads=0,audioCount=0
   const loader={load(path,ok){requests.push(()=>ok(new THREE.Texture()))}}
   const game=createSkyLoft({back:()=>game.xrHooks.onRequestExit(),environmentLoader:loader,
-    companionLoader:{load(path,ok){dogLoads++;ok({scene:new THREE.Group(),animations:['Idle','Trot','HappyHop'].map(name=>new THREE.AnimationClip(name,1,[]))})}},
+    companionLoader:{load(path,ok){dogLoads++;ok({scene:new THREE.Group(),animations:['Idle','Trot','HappyHop','StandUp'].map(name=>new THREE.AnimationClip(name,1,[]))})}},
     audioFactory:()=>{audioCount++;return media},lyricsOptions:{load:async()=>data}})
   const origin=new THREE.Group();origin.position.y=1.6;game.scene.add(origin)
   const session=Object.assign(new EventTarget(),{visibilityState:'visible'})

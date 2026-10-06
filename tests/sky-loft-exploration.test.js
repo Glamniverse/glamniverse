@@ -25,8 +25,8 @@ test('bark stays completely silent with missing asset, blocked activation or fai
 })
 test('greeting bark cooldown, one voice, spatial tracking, conservative gain and cleanup',async()=>{
  const h=audioHarness(),dog={x:2,y:.2,z:-1};h.audio.activate();await flush()
- assert.equal(h.audio.greet(0,dog),true);assert.equal(h.gains[0].gain.value,.24)
- assert.equal(h.panners[0].positionX.value,2);assert.equal(h.panners[0].refDistance,1)
+ assert.equal(h.audio.greet(0,dog),true);assert.equal(h.gains[0].gain.value,.55)
+ assert.equal(h.panners[0].positionX.value,2);assert.equal(h.panners[0].refDistance,2)
  assert.equal(h.audio.greet(1,dog),false);assert.equal(h.audio.greet(20,dog),false);assert.equal(h.sources.length,1)
  h.audio.update({x:1,y:1.6,z:0},{x:1,y:0,z:0},{x:3,y:.2,z:0})
  assert.equal(h.ctx.listener.positionX.value,1);assert.equal(h.panners[0].positionX.value,3)
@@ -95,7 +95,7 @@ test('dog retargets relocated user and remains within approved region',()=>{
 test('one greeting callback per happy cycle, not per hop frame or loop',()=>{
  const parent=new THREE.Group();let ready,count=0
  const c=createCompanion(parent,{load(p,ok){ready=ok}},()=>count++)
- c.load();ready({scene:new THREE.Group(),animations:['Idle','Trot','HappyHop'].map(n=>new THREE.AnimationClip(n,1,[]))})
+ c.load();ready({scene:new THREE.Group(),animations:['Idle','Trot','HappyHop','StandUp'].map(n=>new THREE.AnimationClip(n,1,[]))})
  const head=new THREE.Vector3(0,1.6,0)
  for(let i=0;i<6000;i++)c.update(i*1000/60,head,true)
  assert.ok(count>0&&count<6);c.dispose()
@@ -147,7 +147,7 @@ test('two recordings share one context/voice; whimper is softer, cooldown-limite
  assert.equal(h.audio.greet(0,p),true)
  assert.equal(h.audio.whimper(1,p),false);assert.equal(h.sources.length,1)
  h.sources[0].onended()
- assert.equal(h.audio.whimper(38,p),true);assert.equal(h.gains[1].gain.value,.075)
+ assert.equal(h.audio.whimper(38,p),true);assert.equal(h.gains[1].gain.value,.075);assert.equal(h.panners[1].refDistance,1);assert.equal(h.panners[1].rolloffFactor,1.5)
  assert.equal(h.audio.greet(40,p),false);assert.equal(h.sources.length,2)
  h.sources[1].onended();assert.equal(h.audio.whimper(45,p),false)
  assert.equal(h.audio.whimper(75,p),true);h.audio.reset();assert.equal(h.sources[2].stops,1)
@@ -158,7 +158,7 @@ test('PET -> completed interaction -> player departure routes bark/whimper throu
  const h=audioHarness();h.audio.activate();await flush()
  let ready,select;const kinds=[],root=new THREE.Group()
  const c=createCompanion(root,{load(p,ok){ready=ok}},(time,p,kind)=>{kinds.push(kind);kind==='whimper'?h.audio.whimper(time,p):h.audio.greet(time,p)})
- c.load();ready({scene:new THREE.Group(),animations:['Idle','Trot','HappyHop'].map(n=>new THREE.AnimationClip(n,1,[]))})
+ c.load();ready({scene:new THREE.Group(),animations:['Idle','Trot','HappyHop','StandUp'].map(n=>new THREE.AnimationClip(n,1,[]))})
  const interaction={addTarget(o,s){select=s;return()=>{}}},head=new THREE.Vector3(2.45,1.6,1.05)
  c.bind(interaction,()=>true);c.update(0,head,true);select();let time=0
  for(let i=0;i<65;i++){time+=50;c.update(time,head,true)}
@@ -228,4 +228,25 @@ test('unchanged footprint and comfort constants; rotated anchored room also reco
  const world=h.place.localToWorld(new THREE.Vector3(-6.350001,0,0));h.origin.position.x=world.x;h.origin.position.z=world.z;h.origin.rotation.y=.7
  h.motion.setMode('slow');h.tick();h.left.source.gamepad.axes[2]=1;h.tick(10)
  const recovered=h.place.worldToLocal(headPosition(h));assert.ok(recovered.x>-6.35);assert.ok(Math.abs(recovered.z)<1e-8)
+})
+
+
+test('bark-only attenuation improves normal-distance audibility without changing whimper or music',async()=>{
+ const distance=Math.hypot(1.05,1.6-.3)
+ const attenuation=(ref,rolloff)=>ref/(ref+rolloff*(Math.max(distance,ref)-ref))
+ const before=.24*attenuation(1,1.5),after=BARK.volume*attenuation(BARK.barkRefDistance,BARK.barkRolloff)
+ assert.ok(before>.11&&before<.13);assert.equal(after,.55);assert.ok(after/before>4)
+ assert.equal(BARK.whimperVolume,.075);assert.equal(BARK.refDistance,1);assert.equal(BARK.rolloff,1.5)
+ const h=audioHarness();h.audio.activate();await flush()
+ const root=new THREE.Group();let ready,select;const reactions=[]
+ const c=createCompanion(root,{load(p,ok){ready=ok}},(seconds,p,kind)=>{if(kind==='PET_REACTION'){reactions.push(c.stats().companionPetReaction);h.audio.greet(seconds,p)}})
+ c.load();ready({scene:new THREE.Group(),animations:['Idle','Trot','HappyHop','StandUp'].map(n=>new THREE.AnimationClip(n,n==='StandUp'?2.8:1,[]))})
+ c.bind({addTarget(o,s){select=s;return()=>{}}},()=>true)
+ const head=new THREE.Vector3(2.45,1.6,1.05);let time=0;c.update(time,head,true)
+ select();for(let i=0;i<660;i++){time+=20;c.update(time,head,true)}
+ assert.equal(h.sources.length,1);h.sources[0].onended()
+ select();for(let i=0;i<160;i++){time+=20;c.update(time,head,true)}
+ assert.deepEqual(reactions,['HappyHop','StandUp']);assert.equal(h.sources.length,2)
+ assert.equal(h.panners[1].panningModel,'HRTF');assert.equal(h.panners[1].distanceModel,'inverse');assert.equal(h.panners[1].rolloffFactor,1)
+ c.dispose();h.audio.dispose()
 })
