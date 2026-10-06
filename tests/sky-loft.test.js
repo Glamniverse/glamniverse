@@ -124,7 +124,12 @@ test('geometry budget is bounded; only lyrics and the narrow rift use transparen
 })
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8')
 test('public Sky Loft registers once without Preview flags, keeping capability checks and public games',()=>{
-  const block=source.slice(source.indexOf('// Public Sky Loft release:'),source.indexOf('function showInHisMindRoom'))
+  // End at Sky Loft's own registration, not at the next unrelated world function.
+  const start=source.indexOf('// Public Sky Loft release:')
+  const handler=source.indexOf("}).catch(error => console.warn('Sky Loft entry unavailable:', error))",start)
+  const end=source.indexOf('\n}',handler)
+  assert.ok(start>=0&&handler>start&&end>handler,'Sky Loft registration boundaries must exist')
+  const block=source.slice(start,end+2)
   assert.ok(!block.includes('import.meta.env'))
   assert.equal(source.split("stationaryVRWorlds.add('skyLoft')").length-1,1)
   assert.equal(source.split("import('./games/sky-loft/index.js')").length-1,1)

@@ -199,8 +199,16 @@ test('public All Eyes entry and XR eligibility are enabled without Preview flags
   const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8')
   const eligibility=source.slice(source.indexOf('const stationaryVRWorlds'),source.indexOf('let vrSupported'))
   assert.ok(eligibility.includes("'allEyesOnMe'"))
-  assert.ok(!source.includes('VITE_VERCEL_ENV'))
-  assert.ok(source.includes("if (!await checkVRExperienceSupport('allEyesOnMe')) return"))
+  // Independent experiences may have Preview gates; this registration must not.
+  const start=source.indexOf('// Public release: both games share capability gating before world creation.')
+  const handler=source.indexOf("}).catch(error => console.warn('All Eyes On Me entry unavailable:', error))",start)
+  const end=source.indexOf('\n}',handler)
+  assert.ok(start>=0&&handler>start&&end>handler,'All Eyes registration boundaries must exist')
+  const block=source.slice(start,end+2)
+  const runtime=readFileSync(new URL('../src/games/all-eyes-on-me/index.js',import.meta.url),'utf8')
+  assert.ok(!(eligibility+block+runtime).includes('VITE_VERCEL_ENV'))
+  assert.ok(!block.includes('import.meta.env'))
+  assert.ok(block.includes("if (!await checkVRExperienceSupport('allEyesOnMe')) return"))
 })
 
 test('M2 uses measured beat grid, no simultaneous pairs or downward lanes',()=>{
