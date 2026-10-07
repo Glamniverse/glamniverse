@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { createOceanEnvironment } from './environment.js'
 import { createOceanFish } from './fish.js'
+import { createOceanSchools } from './schools.js'
 import { createSwimMotion } from './swimming.js'
 import { createOceanAudio } from './audio.js'
 import { AUDIO_SRC, SWIM } from './config.js'
@@ -11,7 +12,7 @@ export function createNoAir(){
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x034665)
  const camera=new THREE.PerspectiveCamera(70,window.innerWidth/window.innerHeight,.08,650)
  camera.position.set(0,0,8);camera.lookAt(0,-5,-24)
- const environment=createOceanEnvironment(scene),fish=createOceanFish(scene),motion=createSwimMotion(),music=createOceanAudio(AUDIO_SRC)
+ const environment=createOceanEnvironment(scene),fish=createOceanFish(scene),schools=createOceanSchools(scene),motion=createSwimMotion(),music=createOceanAudio(AUDIO_SRC)
  const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=256
  const ctx=canvas.getContext('2d');ctx.textAlign='center';ctx.fillStyle='#d6f4ff';ctx.font='300 94px sans-serif';ctx.fillText('NO AIR',512,115);ctx.font='28px sans-serif';ctx.fillText('but still breathing',512,175)
  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.generateMipmaps=false;texture.minFilter=THREE.LinearFilter
@@ -19,7 +20,7 @@ export function createNoAir(){
  const head=new THREE.Vector3(),after=new THREE.Vector3(),q=new THREE.Quaternion(),forward=new THREE.Vector3(),step=new THREE.Vector3()
  const input={hands:Array.from({length:2},()=>({position:new THREE.Vector3(),valid:false,grip:false})),leftValid:false,rightValid:false,leftX:0,leftY:0,rightX:0,rightY:0,yaw:0,viewYaw:0,selecting:false}
  const keys=new Set();let xr=null,disposed=false,suspended=false,placed=false,last=null,intro=0,desktopAttached=false,visibility=null
- const reset=()=>{last=null;motion.reset();keys.clear();for(const hand of input.hands)hand.valid=false}
+ const reset=()=>{last=null;motion.reset();schools.reset();keys.clear();for(const hand of input.hands)hand.valid=false}
  function keydown(e){if(e.target?.closest?.('input,textarea'))return;if(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code)){keys.add(e.code);e.preventDefault()}}
  const keyup=e=>keys.delete(e.code)
  function desktop(on){if(on===desktopAttached)return;desktopAttached=on;const method=on?'addEventListener':'removeEventListener';window[method]('keydown',keydown);window[method]('keyup',keyup);window[method]('blur',reset)}
@@ -45,7 +46,7 @@ export function createNoAir(){
   }
  }
  return {scene,camera,
-  getDebugState:()=>({disposed,suspended,placed,audioAvailable:music.available,velocity:motion.velocity.toArray(),...environment.stats()}),
+  getDebugState:()=>({disposed,suspended,placed,audioAvailable:music.available,velocity:motion.velocity.toArray(),...environment.stats(),schools:schools.stats()}),
   update(time,frame){
    if(disposed||suspended)return
    const now=Number.isFinite(time)?time/1000:0;const dt=last===null?0:now-last;last=now
@@ -60,6 +61,7 @@ export function createNoAir(){
      for(const h of input.hands)h.valid=false
      camera.position.add(motion.step(dt,camera.position,input).delta)
     }
+    schools.update(dt,camera.position)
    }else{
     if(!frame||xr.attaching||xr.cancelled||xr.ended||xr.ending||xr.session.visibilityState!=='visible'){reset();music.pause();return}
     const reference=xr.renderer.xr.getReferenceSpace(),pose=reference&&frame.getViewerPose(reference)
@@ -74,6 +76,7 @@ export function createNoAir(){
     }
     readInputs(frame,reference,pose)
     xr.origin.updateWorldMatrix(true,false);head.set(p.x,p.y,p.z).applyMatrix4(xr.origin.matrixWorld)
+    schools.update(dt,head)
     q.set(r.x,r.y,r.z,r.w);forward.set(0,0,-1).applyQuaternion(q).applyQuaternion(xr.origin.quaternion)
     input.yaw=xr.origin.rotation.y;input.viewYaw=Math.atan2(-forward.x,-forward.z)
     if(!input.hands.some(h=>h.valid)){motion.reset();return}
@@ -92,7 +95,7 @@ export function createNoAir(){
    onRequestExit(){reset();music.pause();title.visible=false},
    onExit(){detach();if(!disposed&&!suspended)desktop(true)},
    suspend(){suspended=true;detach();desktop(false);title.visible=false},
-   dispose(){if(disposed)return;disposed=true;suspended=true;detach();desktop(false);music.dispose();environment.dispose();fish.dispose()},
+   dispose(){if(disposed)return;disposed=true;suspended=true;detach();desktop(false);music.dispose();environment.dispose();fish.dispose();schools.dispose()},
   },
  }
 }
