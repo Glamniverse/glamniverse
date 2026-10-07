@@ -84,9 +84,9 @@ test('missing approved song creates no audio; provided hook pauses/releases safe
 test('XR enter/exit/re-entry and suspension own no extra controllers or persistent input',()=>{
  const listeners=new Map();globalThis.window={innerWidth:1280,innerHeight:720,addEventListener(n,f){listeners.set(n,f)},removeEventListener(n){listeners.delete(n)}}
  globalThis.document={createElement(){return {width:0,height:0,getContext(){return {fillText(){}}}}}}
- const world=createNoAir(),session={visibilityState:'visible',addEventListener(n,f){this.listener=f},removeEventListener(){this.listener=null}}
+ const world=createNoAir({audioFactory:()=>({paused:true,play(){this.paused=false;return Promise.resolve()},pause(){this.paused=true},removeAttribute(){},load(){}})}),session={visibilityState:'visible',addEventListener(n,f){this.listener=f},removeEventListener(){this.listener=null}}
  const origin=new THREE.Group();world.scene.add(origin)
- const state={origin,session,renderer:{xr:{getReferenceSpace:()=>({})}},interaction:{controllers:[]}}
+ const state={origin,session,renderer:{xr:{getReferenceSpace:()=>({})}},interaction:{controllers:[],setMenuRays(){},addTarget(){return ()=>{}}}}
  const frame={getViewerPose:()=>({transform:{position:{x:0,y:1.6,z:0},orientation:{x:0,y:0,z:0,w:1}}})}
  world.xrHooks.onEnter(state);world.update(1000,frame);assert.equal(world.getDebugState().placed,true);assert.equal(listeners.size,0)
  world.xrHooks.onRequestExit();world.xrHooks.onExit();assert.deepEqual(world.getDebugState().velocity,[0,0,0]);assert.equal(session.listener,null)

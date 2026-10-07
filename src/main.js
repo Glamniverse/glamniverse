@@ -855,6 +855,7 @@ async function enterActiveWorldVR() {
   xrState = state
   updateVRControl()
   if (!state.world.xrHooks?.ownsAudio) startVRSoundtrack(state)
+  state.world.xrHooks?.onUserGesture?.()
 
   try {
     state.session = await navigator.xr.requestSession('immersive-vr')
@@ -1334,7 +1335,7 @@ if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
   import('./games/no-air/index.js').then(({ createNoAir }) => {
     const card = document.createElement('article'); card.className = 'vr-experience-card'
     const title = document.createElement('h4'); title.textContent = 'NO AIR, BUT STILL BREATHING'
-    const copy = document.createElement('p'); copy.textContent = 'An ocean to disappear into. Preview • Squeeze grips and sweep hands back to swim; release to recover. Left stick: drift. Right stick: rise/dive or snap-turn.'
+    const copy = document.createElement('p'); copy.textContent = 'An ocean to disappear into. Preview • Squeeze grips and sweep hands back to swim; release to recover. Left stick: drift. Right stick: rise/dive or snap-turn. Left Y: menu.'
     const entry = document.createElement('button'); entry.textContent = 'ENTER NO AIR'; entry.id = 'no-air-entry'
     const study = document.createElement('button'); study.textContent = 'DESKTOP OCEAN STUDY'
     async function openOcean(desktop = false) {

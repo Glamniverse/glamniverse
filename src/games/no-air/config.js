@@ -1,5 +1,5 @@
-// M1 Preview only. No replacement music: populate only with a user-approved asset.
-export const AUDIO_SRC = null
+// Official user-approved NO AIR recording; Preview-only experience.
+export const AUDIO_SRC = '/audio/no-air/no_air.mp3'
 export const OCEAN = Object.freeze({ radiusX: 19, radiusZ: 20, centerZ: -3, ceiling: 10,
   floorClearance: 1.35, resistance: 3.5, surfaceY: 42, far: 650 })
 export const SWIM = Object.freeze({ speed: 1.15, acceleration: 1.05, drag: 1.45,
