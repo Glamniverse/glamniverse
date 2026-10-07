@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { createOceanEnvironment } from './environment.js'
 import { createOceanFish } from './fish.js'
 import { createOceanSchools } from './schools.js'
+import { createOceanBotany } from './botany.js'
 import { createSwimMotion } from './swimming.js'
 import { createOceanAudio } from './audio.js'
 import { AUDIO_SRC, SWIM } from './config.js'
@@ -12,7 +13,7 @@ export function createNoAir(){
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x034665)
  const camera=new THREE.PerspectiveCamera(70,window.innerWidth/window.innerHeight,.08,650)
  camera.position.set(0,0,8);camera.lookAt(0,-5,-24)
- const environment=createOceanEnvironment(scene),fish=createOceanFish(scene),schools=createOceanSchools(scene),motion=createSwimMotion(),music=createOceanAudio(AUDIO_SRC)
+ const environment=createOceanEnvironment(scene),fish=createOceanFish(scene),schools=createOceanSchools(scene),botany=createOceanBotany(scene),motion=createSwimMotion(),music=createOceanAudio(AUDIO_SRC)
  const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=256
  const ctx=canvas.getContext('2d');ctx.textAlign='center';ctx.fillStyle='#d6f4ff';ctx.font='300 94px sans-serif';ctx.fillText('NO AIR',512,115);ctx.font='28px sans-serif';ctx.fillText('but still breathing',512,175)
  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.generateMipmaps=false;texture.minFilter=THREE.LinearFilter
@@ -46,11 +47,11 @@ export function createNoAir(){
   }
  }
  return {scene,camera,
-  getDebugState:()=>({disposed,suspended,placed,audioAvailable:music.available,velocity:motion.velocity.toArray(),...environment.stats(),schools:schools.stats()}),
+  getDebugState:()=>({disposed,suspended,placed,audioAvailable:music.available,velocity:motion.velocity.toArray(),...environment.stats(),schools:schools.stats(),botany:botany.stats()}),
   update(time,frame){
    if(disposed||suspended)return
    const now=Number.isFinite(time)?time/1000:0;const dt=last===null?0:now-last;last=now
-   environment.update(now);fish.update(now)
+   environment.update(now);fish.update(now);botany.update(now)
    if(!xr){
     if(dt>0&&dt<.1){
      camera.rotation.order='YXZ';camera.rotation.y+=((keys.has('ArrowLeft')?1:0)-(keys.has('ArrowRight')?1:0))*dt*.5
@@ -95,7 +96,7 @@ export function createNoAir(){
    onRequestExit(){reset();music.pause();title.visible=false},
    onExit(){detach();if(!disposed&&!suspended)desktop(true)},
    suspend(){suspended=true;detach();desktop(false);title.visible=false},
-   dispose(){if(disposed)return;disposed=true;suspended=true;detach();desktop(false);music.dispose();environment.dispose();fish.dispose();schools.dispose()},
+   dispose(){if(disposed)return;disposed=true;suspended=true;detach();desktop(false);music.dispose();environment.dispose();fish.dispose();schools.dispose();botany.dispose()},
   },
  }
 }
