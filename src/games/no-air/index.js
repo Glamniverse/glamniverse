@@ -4,6 +4,7 @@ import { createOceanFish } from './fish.js'
 import { createOceanSchools } from './schools.js'
 import { createOceanBotany } from './botany.js'
 import { createOceanJellyfish } from './jellyfish.js'
+import { createOceanDolphin } from './dolphin.js'
 import { createSwimMotion } from './swimming.js'
 import { createOceanAudio } from './audio.js'
 import { createOceanMenu } from './menu.js'
@@ -15,7 +16,7 @@ export function createNoAir({audioFactory}={}){
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x034665)
  const camera=new THREE.PerspectiveCamera(70,window.innerWidth/window.innerHeight,.08,650)
  camera.position.set(0,0,8);camera.lookAt(0,-5,-24)
- const environment=createOceanEnvironment(scene),fish=createOceanFish(scene),schools=createOceanSchools(scene),botany=createOceanBotany(scene),jellies=createOceanJellyfish(scene),motion=createSwimMotion(),music=createOceanAudio(AUDIO_SRC,audioFactory)
+ const environment=createOceanEnvironment(scene),fish=createOceanFish(scene),schools=createOceanSchools(scene),botany=createOceanBotany(scene),jellies=createOceanJellyfish(scene),dolphin=createOceanDolphin(scene),motion=createSwimMotion(),music=createOceanAudio(AUDIO_SRC,audioFactory)
  const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=256
  const ctx=canvas.getContext('2d');ctx.textAlign='center';ctx.fillStyle='#d6f4ff';ctx.font='300 94px sans-serif';ctx.fillText('NO AIR',512,115);ctx.font='28px sans-serif';ctx.fillText('but still breathing',512,175)
  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.generateMipmaps=false;texture.minFilter=THREE.LinearFilter
@@ -65,7 +66,7 @@ export function createNoAir({audioFactory}={}){
      for(const h of input.hands)h.valid=false
      camera.position.add(motion.step(dt,camera.position,input).delta)
     }
-    schools.update(dt,camera.position)
+    schools.update(dt,camera.position);dolphin.update(dt,camera.position)
    }else{
     if(!frame||xr.attaching||xr.cancelled||xr.ended||xr.ending||xr.session.visibilityState!=='visible'){reset();menu.close();music.reset();return}
     const reference=xr.renderer.xr.getReferenceSpace(),pose=reference&&frame.getViewerPose(reference)
@@ -80,7 +81,7 @@ export function createNoAir({audioFactory}={}){
     }
     readInputs(frame,reference,pose)
     xr.origin.updateWorldMatrix(true,false);head.set(p.x,p.y,p.z).applyMatrix4(xr.origin.matrixWorld)
-    schools.update(dt,head)
+    schools.update(dt,head);dolphin.update(dt,head)
     q.set(r.x,r.y,r.z,r.w);forward.set(0,0,-1).applyQuaternion(q).applyQuaternion(xr.origin.quaternion)
     menu.update(xr,head,q.premultiply(xr.origin.quaternion));if(menu.open){motion.reset();return}
     input.yaw=xr.origin.rotation.y;input.viewYaw=Math.atan2(-forward.x,-forward.z)
@@ -100,7 +101,7 @@ export function createNoAir({audioFactory}={}){
    onRequestExit(){reset();menu.close();music.reset();title.visible=false},
    onExit(){detach();if(!disposed&&!suspended)desktop(true)},
    suspend(){suspended=true;detach();desktop(false);title.visible=false},
-   dispose(){if(disposed)return;disposed=true;suspended=true;detach();desktop(false);menu.dispose();music.dispose();environment.dispose();fish.dispose();schools.dispose();botany.dispose();jellies.dispose()},
+   dispose(){if(disposed)return;disposed=true;suspended=true;detach();desktop(false);menu.dispose();music.dispose();environment.dispose();fish.dispose();schools.dispose();botany.dispose();jellies.dispose();dolphin.dispose()},
   },
  }
 }
