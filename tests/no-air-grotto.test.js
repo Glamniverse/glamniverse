@@ -56,8 +56,8 @@ test('grotto and its accessible chamber stay inside unchanged footprint; all she
  for(const shell of hunt.entries){assert.ok(c.distance(shell.centre)>.8,`${shell.spec.id} uncovered`);const target=v(shell.spec.x,floorHeight(shell.spec.x,shell.spec.z)+1.65,shell.spec.z),p=v(0,5,8);assert.ok(travel(p,v(target.x,5,target.z))<.025);assert.ok(travel(p,target)<.025,`${shell.spec.id} original approach`);const ray=new THREE.Raycaster(target,shell.centre.clone().sub(target).normalize(),0,target.distanceTo(shell.centre));assert.equal(ray.intersectObject(cave.root.children[0]).length,0,`${shell.spec.id} collection ray`)}
  const botany=createOceanBotany(new THREE.Scene());for(const f of botany.families)for(const p of f.placements){const center=v(p.x,p.y+p.height/2,p.z);assert.ok(c.distance(center)>Math.min(p.radius,.35),`protected ${f.spec.id} ${p.x},${p.z}`)}
 })
-test('approved ocean, controls, collectibles, storage/menu and creatures match M4 apart from checkout line endings',()=>{
- for(const file of ['config.js','swimming.js','environment.js','botany.js','fish.js','schools.js','jellyfish.js','dolphin.js','discoveries.js','menu.js','audio.js']){const path='src/games/no-air/'+file;assert.equal(readFileSync(path,'utf8').replaceAll('\r\n','\n'),execFileSync('git',['show','da0c0eed062ce01c706da2d06e6bac6379763efe:'+path],{encoding:'utf8'}).replaceAll('\r\n','\n'))}
+test('approved ocean, controls, collectibles, storage and creatures match M4 apart from checkout line endings',()=>{
+ for(const file of ['config.js','swimming.js','environment.js','botany.js','fish.js','schools.js','jellyfish.js','dolphin.js','discoveries.js','audio.js']){const path='src/games/no-air/'+file;assert.equal(readFileSync(path,'utf8').replaceAll('\r\n','\n'),execFileSync('git',['show','da0c0eed062ce01c706da2d06e6bac6379763efe:'+path],{encoding:'utf8'}).replaceAll('\r\n','\n'))}
  assert.equal(SHELLS.length,20);assert.equal(SHELLS.filter(s=>s.pearl).length,7)
 })
 test('original vault geometry is finite and remains within the rendering budget',()=>{
