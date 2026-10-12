@@ -95,9 +95,9 @@ test('XR enter/exit/re-entry and suspension own no extra controllers or persiste
  world.xrHooks.suspend();assert.equal(session.listener,null);assert.equal(listeners.size,0);world.xrHooks.dispose();world.xrHooks.dispose();assert.equal(world.getDebugState().disposed,true)
  delete globalThis.window;delete globalThis.document
 })
-test('Preview entry reuses capability gate; production cannot expose the new card',()=>{
+test('public NO AIR entry retains the headset capability gate and lifecycle',()=>{
  const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');const start=source.indexOf('// NO AIR M1'),end=source.indexOf('function showInHisMindRoom()',start);const block=source.slice(start,end)
- assert.match(block,/import\.meta\.env\.DEV \|\| import\.meta\.env\.VITE_VERCEL_ENV === 'preview'/)
+ assert.doesNotMatch(block,/import\.meta\.env|VITE_VERCEL_ENV/);assert.match(block,/ENTER NO AIR/)
  assert.match(block,/checkVRExperienceSupport\('noAir'/);assert.match(block,/createWorldLifecycle\(ocean.scene\)/);assert.match(block,/startWorldAnimation\('noAir'/)
  assert.doesNotMatch(block,/requestSession|new THREE.WebGLRenderer|sky-loft/)
 })

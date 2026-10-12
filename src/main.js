@@ -115,8 +115,15 @@ document.querySelector('#app').innerHTML = `
       </div>
     </section>
 
-    <section class="section socials">
-      <h2>Connect with Glamniverse</h2>
+    <section id="contact" class="section socials">
+      <h2>LET'S CONNECT</h2>
+      <div class="contact-copy">
+        <p>Have an idea, a suggestion, or just want to say hello?</p>
+        <p>I'd love to hear from you.</p>
+        <p>For inquiries, collaborations, or anything Glamniverse-related, feel free to reach out.</p>
+        <p><a class="contact-email" href="mailto:anysglamniverse@gmail.com">anysglamniverse@gmail.com</a></p>
+        <p class="contact-closing">Every connection starts somewhere. 🖤</p>
+      </div>
 
       <div class="platform-grid">
         <a class="platform-card" href="https://www.tiktok.com/@glamniverse?_r=1&_t=ZN-970rsKo1U4E" target="_blank">
@@ -1329,13 +1336,13 @@ window.openSmashTheHate = async function () {
     document.querySelector('#vr-experience-grid').appendChild(card)
   }).catch(error => console.warn('Sky Loft entry unavailable:', error))
 }
-// NO AIR M1 is only exposed in local development and Vercel Preview.
-if (import.meta.env.DEV || import.meta.env.VITE_VERCEL_ENV === 'preview') {
+// NO AIR M1 — approved public entry; headset capability checks remain intact.
+{
   stationaryVRWorlds.add('noAir')
   import('./games/no-air/index.js').then(({ createNoAir }) => {
     const card = document.createElement('article'); card.className = 'vr-experience-card'
     const title = document.createElement('h4'); title.textContent = 'NO AIR, BUT STILL BREATHING'
-    const copy = document.createElement('p'); copy.textContent = 'An ocean to disappear into. Preview • Squeeze grips and sweep hands back to swim; release to recover. Left stick: drift. Right stick: rise/dive or snap-turn. Left Y: menu.'
+    const copy = document.createElement('p'); copy.textContent = 'An ocean to disappear into. Squeeze grips and sweep hands back to swim; release to recover. Left stick: drift. Right stick: rise/dive or snap-turn. Left Y: menu.'
     const entry = document.createElement('button'); entry.textContent = 'ENTER NO AIR'; entry.id = 'no-air-entry'
     const study = document.createElement('button'); study.textContent = 'DESKTOP OCEAN STUDY'
     async function openOcean(desktop = false) {
